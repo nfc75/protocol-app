@@ -1,0 +1,22 @@
+{
+  "name": "Nelson's Protocol",
+  "short_name": "Protocol",
+  "description": "Integrated daily protocol — Ayurveda, training, supplements, and wellness tracking",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F5EFE4",
+  "theme_color": "#C4724A",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
