@@ -342,8 +342,12 @@ const CSS=`
 .sh{position:fixed;bottom:-100%;left:0;right:0;max-width:480px;margin:0 auto;
   background:var(--bg);border-radius:22px 22px 0 0;z-index:301;
   padding:0 0 calc(20px + var(--sb));max-height:90dvh;overflow-y:auto;
-  transition:bottom .4s cubic-bezier(.4,0,.2,1);}
+  transition:bottom .4s cubic-bezier(.4,0,.2,1);
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
 .sh.open{bottom:0;}
+.shh{touch-action:none;}
+.confirm-sheet{position:fixed;bottom:-100%;left:0;right:0;max-width:480px;margin:0 auto;background:var(--bg);border-radius:22px 22px 0 0;z-index:302;padding:0 0 calc(16px + var(--sb));transition:bottom .35s cubic-bezier(.4,0,.2,1);-webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+.confirm-sheet.open{bottom:0;}
 .shh{width:38px;height:4px;background:var(--stl);border-radius:2px;margin:11px auto 0;}
 .shhdr{padding:14px 18px 10px;border-bottom:1px solid var(--bg2);}
 .shtl{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:600;color:var(--ink);}
@@ -634,7 +638,7 @@ function darkenHex(hex,factor=0.18){
 // Pre-compute darkened bg colours for button panels
 const CAT_BTN_BG=Object.fromEntries(Object.entries(CAT_COLORS).map(([k,c])=>[k,darkenHex(c.bg,0.18)]));
 
-function TaskCard({task,done,time,comment,actualDuration,onComplete,onUndo,onSheet}){
+function TaskCard({task,done,time,comment,actualDuration,onComplete,onUndo,onSheet,onRemove}){
   const cat=CAT_COLORS[task.category]||CAT_COLORS.movement;
   const pri=PRI_COLORS[task.priority]||PRI_COLORS.recommended;
   const btnBg=CAT_BTN_BG[task.category]||CAT_BTN_BG.movement;
@@ -678,9 +682,10 @@ function TaskCard({task,done,time,comment,actualDuration,onComplete,onUndo,onShe
           </div>
         )}
       </div>
-      <div style={{display:"flex",flexDirection:"column",background:btnBg,flexShrink:0,borderLeft:`1px solid rgba(36,28,20,.06)`}}>
-        <button style={{flex:1,border:"none",background:"transparent",cursor:"pointer",padding:"0 13px",color:"#4A3A28",fontSize:".82rem",borderBottom:"1px solid rgba(36,28,20,.08)",minWidth:44,minHeight:36}} onClick={e=>{e.stopPropagation();onSheet();}}>✎</button>
-        <button style={{flex:1,border:"none",background:"rgba(74,107,74,.18)",cursor:"pointer",padding:"0 13px",color:"#2A4A2A",fontSize:".85rem",fontWeight:700,minWidth:44,minHeight:36}} onClick={e=>{e.stopPropagation();onComplete();}}>✓</button>
+      <div style={{display:"flex",flexDirection:"column",background:btnBg,flexShrink:0,borderLeft:"1px solid rgba(36,28,20,.06)"}}>
+        {onRemove&&<button style={{flex:1,border:"none",background:"rgba(180,60,60,.12)",cursor:"pointer",padding:"0 13px",color:"#B03030",fontSize:".78rem",borderBottom:"1px solid rgba(36,28,20,.08)",minWidth:44,minHeight:28}} onClick={e=>{e.stopPropagation();onRemove();}}>✕</button>}
+        <button style={{flex:1,border:"none",background:"transparent",cursor:"pointer",padding:"0 13px",color:"#4A3A28",fontSize:".82rem",borderBottom:"1px solid rgba(36,28,20,.08)",minWidth:44,minHeight:28}} onClick={e=>{e.stopPropagation();onSheet();}}>✎</button>
+        <button style={{flex:1,border:"none",background:"rgba(74,107,74,.18)",cursor:"pointer",padding:"0 13px",color:"#2A4A2A",fontSize:".85rem",fontWeight:700,minWidth:44,minHeight:28}} onClick={e=>{e.stopPropagation();onComplete();}}>✓</button>
       </div>
     </div>
   );
@@ -806,7 +811,8 @@ function LibCard({task,onAddToday,onEdit,showAdd=true}){
 
 // ─── TIME BLOCK ──────────────────────────────────────────────────────────────
 function TimeBlock({block,tasks,dayData,blockOpen,onToggle,onComplete,onUndo,onSheet,onSymChange,onSymSave,onRemove}){
-  const blockTasks=sortTasks(tasks.filter(t=>t.block===block.id&&!t.hidden&&!t.archived));
+  // tasks already pre-filtered and sorted for this block by the parent
+    const blockTasks=tasks;
   const mand=blockTasks.filter(t=>t.priority==="mandatory"&&t.category!=="tracking");
   const comp=mand.filter(t=>dayData.completed?.[t.id]);
   const pct=mand.length>0?Math.round((comp.length/mand.length)*100):0;
@@ -849,16 +855,18 @@ function TimeBlock({block,tasks,dayData,blockOpen,onToggle,onComplete,onUndo,onS
             const actualDuration=dayData.durations?.[task.id];
             const taskKey=task.instanceId||task.id;
             return(
-              <div key={taskKey} style={{position:"relative"}}>
-                {!done&&(
-                  <button onClick={e=>{e.stopPropagation();onRemove(task);}}
-                    style={{position:"absolute",top:5,right:52,zIndex:5,background:"rgba(180,60,60,.1)",
-                      border:"none",borderRadius:"50%",width:22,height:22,cursor:"pointer",
-                      fontSize:".7rem",color:"#B03030",display:"flex",alignItems:"center",
-                      justifyContent:"center",lineHeight:1}}>✕</button>
-                )}
-                <TaskCard task={task} done={done} time={time} comment={taskComment} actualDuration={actualDuration} onComplete={()=>onComplete(task.id)} onUndo={()=>onUndo(task.id)} onSheet={()=>onSheet(task)}/>
-              </div>
+              <TaskCard
+                key={taskKey}
+                task={task}
+                done={done}
+                time={time}
+                comment={taskComment}
+                actualDuration={actualDuration}
+                onComplete={()=>onComplete(task.id)}
+                onUndo={()=>onUndo(task.id)}
+                onSheet={()=>onSheet(task)}
+                onRemove={()=>onRemove(task)}
+              />
             );
           })}
         </div>
@@ -1378,9 +1386,13 @@ function App(){
       const updated=existing.filter(t=>t.instanceId!==task.instanceId);
       lsSet(key,updated);
       setTodayExtras(prev=>({...prev,[date]:updated}));
-      const c={...dayData.completed};const t2={...dayData.times};
+      // Use fresh data from storage to avoid stale closure
+      const fresh=loadDay(date);
+      const c={...fresh.completed};const t2={...fresh.times};
       delete c[task.id];delete t2[task.id];
-      upd({...dayData,completed:c,times:t2});
+      const updated2={...fresh,completed:c,times:t2};
+      saveDay(date,updated2);
+      setAllData(prev=>({...prev,[date]:updated2}));
     } else {
       setSkipComment("");
       setRemoveConfirm(task);
@@ -1388,11 +1400,14 @@ function App(){
   };
 
   const skipToday=(task,comment)=>{
-    const removed=[...(dayData.removed||[])];
+    const fresh=loadDay(date);
+    const removed=[...(fresh.removed||[])];
     if(!removed.includes(task.id))removed.push(task.id);
-    const comments={...dayData.comments};
+    const comments={...fresh.comments};
     if(comment&&comment.trim())comments["skip_"+task.id]=comment.trim();
-    upd({...dayData,removed,comments});
+    const updated={...fresh,removed,comments};
+    saveDay(date,updated);
+    setAllData(prev=>({...prev,[date]:updated}));
     setRemoveConfirm(null);
     setSkipComment("");
   };
