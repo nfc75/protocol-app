@@ -512,34 +512,77 @@ function useTimer(secs){
 }
 
 // ─── EDIT FORM ──────────────────────────────────────────────────────────────
+// ─── SORT HELPER ─────────────────────────────────────────────────────────────
+const PRI_ORDER={mandatory:0,recommended:1,optional:2};
+function sortTasks(tasks){
+  const tracking=tasks.filter(t=>t.category==="tracking");
+  const rest=tasks.filter(t=>t.category!=="tracking");
+  rest.sort((a,b)=>{
+    const pd=(PRI_ORDER[a.priority]||0)-(PRI_ORDER[b.priority]||0);
+    if(pd!==0)return pd;
+    return(a.name||"").localeCompare(b.name||"");
+  });
+  return[...rest,...tracking];
+}
+
+// ─── BLOCKS ARRAY MIGRATION ───────────────────────────────────────────────────
+// Tasks may have a single block string or a blocks array — normalise to array
+function getBlocks(task){
+  if(Array.isArray(task.blocks)&&task.blocks.length>0)return task.blocks;
+  if(task.block)return[task.block];
+  return["morning"];
+}
+
+
 function EditForm({task,onSave,onCancel,isSupp=false}){
+  const initBlocks=Array.isArray(task.blocks)&&task.blocks.length>0?task.blocks:task.block?[task.block]:["morning"];
+  const initVideos=Array.isArray(task.videos)&&task.videos.length>0?task.videos.map(v=>typeof v==="string"?{url:v,label:""}:v):[{url:"",label:""}];
   const[f,setF]=useState({
     name:task.name||"",
     instruction:task.instruction||"",
-    duration:task.duration||"—",
-    block:task.block||"morning",
+    duration:isSupp?"—":(task.duration||"—"),
+    blocks:initBlocks,
     priority:task.priority||"recommended",
-    category:task.category||"movement",
+    category:isSupp?"supplements":(task.category||"movement"),
     scent:task.scent||"",
     sound:task.sound||"",
     notes:task.notes||task.purpose||"",
     dose:task.dose||"",
     timing:task.timing||"",
-    active:task.active!==false,
+    inSchedule:task.inSchedule!==false,
+    videos:initVideos,
   });
   const set=(k,v)=>setF(x=>({...x,[k]:v}));
+  const toggleBlock=b=>set("blocks",f.blocks.includes(b)?f.blocks.filter(x=>x!==b):[...f.blocks,b]);
+  const setVideo=(i,field,val)=>{const vs=[...f.videos];vs[i]={...vs[i],[field]:val};set("videos",vs);};
+  const addVideo=()=>set("videos",[...f.videos,{url:"",label:""}]);
+  const removeVideo=i=>set("videos",f.videos.filter((_,idx)=>idx!==i));
+  const onSaveWrapped=()=>{
+    // Convert videos back to URL strings for storage
+    const videos=f.videos.map(v=>v.url).filter(Boolean);
+    onSave({...f,videos,block:f.blocks[0]||"morning"});
+  };
   return(
     <div className="edit-form fade">
       <div className="ef-title">{task.id?"Edit":"New"} {isSupp?"Supplement":"Activity"}</div>
       <div className="ff"><label className="fl">Name</label><input className="fi" value={f.name} onChange={e=>set("name",e.target.value)}/></div>
-      {isSupp&&<><div className="fr2"><div className="ff"><label className="fl">Dose</label><input className="fi" value={f.dose} onChange={e=>set("dose",e.target.value)} placeholder="e.g. 2 caps"/></div><div className="ff"><label className="fl">Timing text</label><input className="fi" value={f.timing} onChange={e=>set("timing",e.target.value)} placeholder="e.g. With dinner"/></div></div></>}
-      {!isSupp&&<div className="ff"><label className="fl">Instruction (max 50 chars)</label><input className="fi" value={f.instruction} maxLength={55} onChange={e=>set("instruction",e.target.value)}/></div>}
-      <div className="fr2">
-        <div className="ff"><label className="fl">Duration</label><input className="fi" value={f.duration} onChange={e=>set("duration",e.target.value)} placeholder="e.g. 10 min"/></div>
-        <div className="ff"><label className="fl">Time Block</label>
-          <select className="fsel" value={f.block} onChange={e=>set("block",e.target.value)}>
-            {BLOCK_IDS.map(b=><option key={b} value={b}>{b}</option>)}
-          </select>
+      {isSupp&&<div className="fr2"><div className="ff"><label className="fl">Dose</label><input className="fi" value={f.dose} onChange={e=>set("dose",e.target.value)} placeholder="e.g. 2 caps"/></div><div className="ff"><label className="fl">Timing note</label><input className="fi" value={f.timing} onChange={e=>set("timing",e.target.value)} placeholder="e.g. With dinner"/></div></div>}
+      {!isSupp&&<>
+        <div className="ff"><label className="fl">Instruction (max 50 chars)</label><input className="fi" value={f.instruction} maxLength={55} onChange={e=>set("instruction",e.target.value)}/></div>
+        <div className="ff"><label className="fl">Duration</label><input className="fi" value={f.duration} onChange={e=>set("duration",e.target.value)} placeholder="e.g. 10 min or —"/></div>
+      </>}
+      <div className="ff">
+        <label className="fl">Time Blocks</label>
+        <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:2}}>
+          {BLOCK_IDS.map(b=>(
+            <button key={b} type="button" onClick={()=>toggleBlock(b)} style={{
+              padding:"5px 11px",borderRadius:20,border:"1px solid",cursor:"pointer",
+              fontSize:".75rem",fontFamily:"'Jost',sans-serif",
+              background:f.blocks.includes(b)?"#7A6230":"white",
+              borderColor:f.blocks.includes(b)?"#7A6230":"var(--stl)",
+              color:f.blocks.includes(b)?"white":"var(--inkl)",
+            }}>{BLOCKS.find(bl=>bl.id===b)?.emoji} {b}</button>
+          ))}
         </div>
       </div>
       <div className="fr2">
@@ -558,33 +601,61 @@ function EditForm({task,onSave,onCancel,isSupp=false}){
       </div>
       <div className="ff"><label className="fl">🌸 Scent (optional)</label><input className="fi" value={f.scent} onChange={e=>set("scent",e.target.value)} placeholder="e.g. Frankincense"/></div>
       <div className="ff"><label className="fl">🎵 Sound (optional)</label><input className="fi" value={f.sound} onChange={e=>set("sound",e.target.value)} placeholder="e.g. Raga Bhairav"/></div>
+      {!isSupp&&<div className="ff">
+        <label className="fl">Video / Instruction Links</label>
+        {f.videos.map((v,i)=>(
+          <div key={i} style={{display:"flex",gap:5,marginBottom:5,alignItems:"center"}}>
+            <input className="fi" style={{flex:1}} value={v.url} onChange={e=>setVideo(i,"url",e.target.value)} placeholder="https://..."/>
+            <button type="button" onClick={()=>removeVideo(i)} style={{background:"rgba(180,60,60,.1)",border:"none",borderRadius:7,cursor:"pointer",padding:"0 10px",color:"#B03030",minHeight:40,fontSize:".85rem"}}>✕</button>
+          </div>
+        ))}
+        <button type="button" onClick={addVideo} style={{background:"rgba(122,98,48,.1)",border:"1px dashed rgba(122,98,48,.3)",borderRadius:8,cursor:"pointer",padding:"7px 12px",color:"#7A6230",fontSize:".78rem",width:"100%",fontFamily:"'Jost',sans-serif"}}>+ Add Link</button>
+      </div>}
       <div className="ff"><label className="fl">Notes / Purpose</label><textarea className="stx" value={f.notes} rows={2} onChange={e=>set("notes",e.target.value)}/></div>
+      <div style={{display:"flex",alignItems:"center",gap:8,padding:"4px 0 8px"}}>
+        <label className="fl" style={{margin:0}}>In Schedule</label>
+        <button type="button" className={`stog${f.inSchedule?" on":" off"}`} style={{minHeight:28,minWidth:44}} onClick={()=>set("inSchedule",!f.inSchedule)}/>
+        <span style={{fontSize:".7rem",color:"var(--mu)"}}>{f.inSchedule?"Appears in Today daily":"Not in daily schedule"}</span>
+      </div>
       <div className="fact">
         <button className="fcl" onClick={onCancel}>Cancel</button>
-        <button className="fsv" onClick={()=>onSave(f)}>Save</button>
+        <button className="fsv" onClick={onSaveWrapped}>Save</button>
       </div>
     </div>
   );
 }
 
-// ─── TASK CARD (split design) ────────────────────────────────────────────────
-function TaskCard({task,done,time,onComplete,onUndo,onSheet}){
+// ─── TASK CARD (split design — Option 3 button colours) ─────────────────────
+// Darken a hex color by a given factor
+function darkenHex(hex,factor=0.18){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return`rgb(${Math.round(r*(1-factor))},${Math.round(g*(1-factor))},${Math.round(b*(1-factor))})`;
+}
+// Pre-compute darkened bg colours for button panels
+const CAT_BTN_BG=Object.fromEntries(Object.entries(CAT_COLORS).map(([k,c])=>[k,darkenHex(c.bg,0.18)]));
+
+function TaskCard({task,done,time,comment,actualDuration,onComplete,onUndo,onSheet}){
   const cat=CAT_COLORS[task.category]||CAT_COLORS.movement;
   const pri=PRI_COLORS[task.priority]||PRI_COLORS.recommended;
+  const btnBg=CAT_BTN_BG[task.category]||CAT_BTN_BG.movement;
   if(done){
+    const preview=comment?comment.slice(0,30)+(comment.length>30?"…":""):null;
+    const durLabel=actualDuration?actualDuration+"m":null;
     return(
       <div className="tcard done" style={{borderColor:"rgba(74,107,74,.2)"}}>
         <div className="tcard-left" style={{background:DONE_PANEL}}>
           <span className="done-check">✓</span>
         </div>
-        <div className="tcard-right" style={{background:DONE_BG}}>
-          <div className="tmin" style={{padding:0}}>
-            <div className="tmin-right">
-              <span className="tmin-name">{task.name}</span>
-              {time&&<span className="tmin-time">at {time}</span>}
-            </div>
-            <button className="tmin-undo" onClick={e=>{e.stopPropagation();onUndo();}}>undo</button>
+        <div className="tcard-right" style={{background:DONE_BG,flex:1,padding:"7px 10px",minWidth:0}}>
+          <div style={{fontSize:".8rem",color:"#6A5A48",textDecoration:"line-through",fontWeight:500,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{task.name}</div>
+          <div style={{fontSize:".65rem",color:"#8A7A68",marginTop:2,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+            {time&&<span>🕐 {time}</span>}
+            {durLabel&&<span>⏱ {durLabel}</span>}
+            {preview&&<span style={{fontStyle:"italic"}}>"{preview}"</span>}
           </div>
+        </div>
+        <div style={{background:DONE_PANEL,display:"flex",alignItems:"center",padding:"0 10px",flexShrink:0}}>
+          <button className="tmin-undo" style={{color:"rgba(255,255,255,.75)",minHeight:36}} onClick={e=>{e.stopPropagation();onUndo();}}>undo</button>
         </div>
       </div>
     );
@@ -597,7 +668,7 @@ function TaskCard({task,done,time,onComplete,onUndo,onSheet}){
       <div className="tcard-right" style={{background:cat.bg}}>
         <div className="tcard-row">
           <div className="tcard-name">{task.name}</div>
-          {task.duration!=="—"&&task.duration&&<span className="tcard-dur">{task.duration}</span>}
+          {task.duration&&task.duration!=="—"&&<span className="tcard-dur">{task.duration}</span>}
         </div>
         <div className="tcard-instr">{task.instruction}</div>
         {(task.scent||task.sound)&&(
@@ -607,9 +678,9 @@ function TaskCard({task,done,time,onComplete,onUndo,onSheet}){
           </div>
         )}
       </div>
-      <div className="tcard-actions">
-        <button className="tbtn tbtn-c" onClick={e=>{e.stopPropagation();onSheet();}}>✎</button>
-        <button className="tbtn tbtn-d" onClick={e=>{e.stopPropagation();onComplete();}}>✓</button>
+      <div style={{display:"flex",flexDirection:"column",background:btnBg,flexShrink:0,borderLeft:`1px solid rgba(36,28,20,.06)`}}>
+        <button style={{flex:1,border:"none",background:"transparent",cursor:"pointer",padding:"0 13px",color:"#4A3A28",fontSize:".82rem",borderBottom:"1px solid rgba(36,28,20,.08)",minWidth:44,minHeight:36}} onClick={e=>{e.stopPropagation();onSheet();}}>✎</button>
+        <button style={{flex:1,border:"none",background:"rgba(74,107,74,.18)",cursor:"pointer",padding:"0 13px",color:"#2A4A2A",fontSize:".85rem",fontWeight:700,minWidth:44,minHeight:36}} onClick={e=>{e.stopPropagation();onComplete();}}>✓</button>
       </div>
     </div>
   );
@@ -680,7 +751,10 @@ function Sheet({task,open,onClose,onComplete,comment,onCC,onSave,time,onTimeChan
             </>
           )}
           <div className="shlb">Time Completed</div>
-          <input className="tinput" type="time" value={time||""} onChange={e=>onTimeChange(e.target.value)} style={{marginBottom:4}}/>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+            <span style={{fontSize:"1.1rem"}}>🕐</span>
+            <input className="tinput" type="time" value={time||""} onChange={e=>onTimeChange(e.target.value)} style={{flex:1}}/>
+          </div>
           <div className="shlb">Comment</div>
           <textarea className="cta" value={comment} onChange={e=>onCC(e.target.value)} placeholder="Add a note about this session..."/>
           <button className="shsv" onClick={()=>{onSave();onClose();}}>Save Comment</button>
@@ -731,8 +805,8 @@ function LibCard({task,onAddToday,onEdit,showAdd=true}){
 }
 
 // ─── TIME BLOCK ──────────────────────────────────────────────────────────────
-function TimeBlock({block,tasks,dayData,blockOpen,onToggle,onComplete,onUndo,onSheet,onSymChange,onSymSave}){
-  const blockTasks=tasks.filter(t=>t.block===block.id&&!t.hidden&&!t.archived);
+function TimeBlock({block,tasks,dayData,blockOpen,onToggle,onComplete,onUndo,onSheet,onSymChange,onSymSave,onRemove}){
+  const blockTasks=sortTasks(tasks.filter(t=>t.block===block.id&&!t.hidden&&!t.archived));
   const mand=blockTasks.filter(t=>t.priority==="mandatory"&&t.category!=="tracking");
   const comp=mand.filter(t=>dayData.completed?.[t.id]);
   const pct=mand.length>0?Math.round((comp.length/mand.length)*100):0;
@@ -771,7 +845,21 @@ function TimeBlock({block,tasks,dayData,blockOpen,onToggle,onComplete,onUndo,onS
             }
             const done=dayData.completed?.[task.id];
             const time=dayData.times?.[task.id];
-            return<TaskCard key={task.id} task={task} done={done} time={time} onComplete={()=>onComplete(task.id)} onUndo={()=>onUndo(task.id)} onSheet={()=>onSheet(task)}/>;
+            const taskComment=dayData.comments?.[task.id];
+            const actualDuration=dayData.durations?.[task.id];
+            const taskKey=task.instanceId||task.id;
+            return(
+              <div key={taskKey} style={{position:"relative"}}>
+                {!done&&(
+                  <button onClick={e=>{e.stopPropagation();onRemove(task);}}
+                    style={{position:"absolute",top:5,right:52,zIndex:5,background:"rgba(180,60,60,.1)",
+                      border:"none",borderRadius:"50%",width:22,height:22,cursor:"pointer",
+                      fontSize:".7rem",color:"#B03030",display:"flex",alignItems:"center",
+                      justifyContent:"center",lineHeight:1}}>✕</button>
+                )}
+                <TaskCard task={task} done={done} time={time} comment={taskComment} actualDuration={actualDuration} onComplete={()=>onComplete(task.id)} onUndo={()=>onUndo(task.id)} onSheet={()=>onSheet(task)}/>
+              </div>
+            );
           })}
         </div>
       )}
@@ -783,7 +871,7 @@ function TimeBlock({block,tasks,dayData,blockOpen,onToggle,onComplete,onUndo,onS
 function RefTab({title,subtitle,categoryFilter,allTasks,onAddToday,onEditTask,extraContent}){
   const[editingId,setEditingId]=useState(null);
   const[showArchived,setShowArchived]=useState(false);
-  const active=allTasks.filter(t=>t.category===categoryFilter&&!t.archived&&!t.hidden);
+  const active=sortTasks(allTasks.filter(t=>t.category===categoryFilter&&!t.archived&&!t.hidden));
   const archived=allTasks.filter(t=>t.category===categoryFilter&&t.archived);
 
   return(
@@ -813,7 +901,7 @@ function RefTab({title,subtitle,categoryFilter,allTasks,onAddToday,onEditTask,ex
 }
 
 // ─── SUPPLEMENTS TAB ─────────────────────────────────────────────────────────
-function SupplementsTab({allTasks,customSupps,onAdd,onUpdate,onDelete,onEditTask}){
+function SupplementsTab({allTasks,customSupps,onAdd,onUpdate,onDelete,onEditTask,onAddToday}){
   const[showForm,setShowForm]=useState(false);
   const[editingId,setEditingId]=useState(null);
   const builtinSupps=allTasks.filter(t=>t.category==="supplements"&&!t.archived&&!t.hidden&&!t.id.startsWith("cs-"));
@@ -828,12 +916,16 @@ function SupplementsTab({allTasks,customSupps,onAdd,onUpdate,onDelete,onEditTask
         editingId===t.id
           ?<EditForm key={t.id} task={t} isSupp={true} onSave={f=>{onEditTask(t.id,f);setEditingId(null);}} onCancel={()=>setEditingId(null)}/>
           :<div key={t.id} className="sc2">
-            <div className="sch"><div className="sn">{t.name}</div></div>
+            <div className="sch">
+              <div className="sn">{t.name}</div>
+              <button className={`stog${t.inSchedule!==false?" on":" off"}`} onClick={()=>onEditTask(t.id,{inSchedule:t.inSchedule===false})}/>
+            </div>
             <div className="sm2">{t.dose?" · "+t.dose:""}{t.timing?" · "+t.timing:t.instruction?" · "+t.instruction:""} · <span className={`pb2 ${t.priority}`}>{PRI_COLORS[t.priority]?.label}</span></div>
             {(t.notes||t.purpose)&&<div className="sp2">{t.notes||t.purpose}</div>}
             {(t.scent||t.sound)&&<div style={{marginTop:4,fontSize:".65rem",color:"#7A6230"}}>{t.scent&&"🌸 "+t.scent}{t.sound&&" · 🎵 "+t.sound}</div>}
             <div className="supp-actions">
               <button className="supp-btn supp-btn-edit" onClick={()=>setEditingId(t.id)}>✎ Edit</button>
+              <button className="supp-btn" style={{background:"rgba(74,107,74,.1)",color:"#4A6B4A"}} onClick={()=>onAddToday(t)}>+ Today</button>
               <button className="supp-btn supp-btn-arch" onClick={()=>onEditTask(t.id,{archived:true})}>Archive</button>
             </div>
           </div>
@@ -841,17 +933,18 @@ function SupplementsTab({allTasks,customSupps,onAdd,onUpdate,onDelete,onEditTask
       <div className="sdv" style={{marginTop:4}}>Custom Supplements</div>
       {customSupps.map(s=>(
         editingId===s.id
-          ?<EditForm key={s.id} task={s} isSupp={true} onSave={f=>{onUpdate(s.id,{...f,active:f.active!==false});setEditingId(null);}} onCancel={()=>setEditingId(null)}/>
+          ?<EditForm key={s.id} task={s} isSupp={true} onSave={f=>{onUpdate(s.id,{...f,inSchedule:f.inSchedule!==false});setEditingId(null);}} onCancel={()=>setEditingId(null)}/>
           :<div key={s.id} className="sc2">
             <div className="sch">
               <div className="sn">{s.name}</div>
-              <button className={`stog${s.active!==false?" on":" off"}`} onClick={()=>onUpdate(s.id,{active:s.active===false})}/>
+              <button className={`stog${s.inSchedule!==false?" on":" off"}`} onClick={()=>onUpdate(s.id,{inSchedule:s.inSchedule===false})}/>
             </div>
-            <div className="sm2">{s.dose&&s.dose+" · "}{s.timing&&s.timing+" · "}<span className={`pb2 ${s.priority||"optional"}`}>{PRI_COLORS[s.priority||"optional"]?.label}</span> · {CAT_COLORS[s.block]?.label||s.block}</div>
+            <div className="sm2">{s.dose&&s.dose+" · "}{s.timing&&s.timing+" · "}<span className={`pb2 ${s.priority||"optional"}`}>{PRI_COLORS[s.priority||"optional"]?.label}</span></div>
             {s.notes&&<div className="sp2">{s.notes}</div>}
             <div className="supp-actions">
               <button className="supp-btn supp-btn-edit" onClick={()=>setEditingId(s.id)}>✎ Edit</button>
-              <button className="supp-btn supp-btn-arch" onClick={()=>onUpdate(s.id,{active:false,archived:true})}>Archive</button>
+              <button className="supp-btn" style={{background:"rgba(74,107,74,.1)",color:"#4A6B4A"}} onClick={()=>onAddToday(s)}>+ Today</button>
+              <button className="supp-btn supp-btn-arch" onClick={()=>onUpdate(s.id,{inSchedule:false,archived:true})}>Archive</button>
               <button className="supp-btn supp-btn-del" onClick={()=>{if(window.confirm("Delete permanently?"))onDelete(s.id);}}>Delete</button>
             </div>
           </div>
@@ -1076,6 +1169,96 @@ function DinaTab({allTasks,onAddToday,onEditTask}){
 }
 
 // ─── MAIN APP ────────────────────────────────────────────────────────────────
+// ─── DURATION PROMPT ─────────────────────────────────────────────────────────
+function DurationPrompt({task,open,onConfirm,onCancel}){
+  const defaultMins=parseDur(task?.duration||"")/60||0;
+  const[mins,setMins]=useState(defaultMins);
+  useEffect(()=>{if(open)setMins(parseDur(task?.duration||"")/60||0);},[open,task?.id]);
+  if(!task)return null;
+  const cat=CAT_COLORS[task.category]||CAT_COLORS.movement;
+  const pri=PRI_COLORS[task.priority]||PRI_COLORS.recommended;
+  return(
+    <>
+      <div className={`shov${open?" open":""}`} onClick={onCancel} style={{zIndex:303}}/>
+      <div className={`confirm-sheet${open?" open":""}`} style={{zIndex:304}}>
+        <div className="shh"/>
+        <div style={{padding:"14px 18px 6px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:4}}>
+            <div style={{width:36,height:36,borderRadius:9,background:pri.panel,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"1.1rem",flexShrink:0}}>{cat.icon}</div>
+            <div>
+              <div style={{fontFamily:"'Cormorant Garamond',serif",fontSize:"1.05rem",fontWeight:600,color:"var(--ink)"}}>{task.name}</div>
+              <div style={{fontSize:".68rem",color:"var(--mu)"}}>How long did you practice?</div>
+            </div>
+          </div>
+        </div>
+        <div style={{padding:"8px 18px 0"}}>
+          <div style={{display:"flex",alignItems:"center",gap:10,background:"rgba(122,98,48,.07)",borderRadius:11,padding:"12px 14px"}}>
+            <input
+              type="number"
+              inputMode="numeric"
+              value={mins}
+              onChange={e=>setMins(Math.max(0,parseInt(e.target.value)||0))}
+              style={{width:72,padding:"8px 10px",border:"1px solid var(--stl)",borderRadius:8,background:"white",fontFamily:"'Cormorant Garamond',serif",fontSize:"1.6rem",textAlign:"center",color:"#8B4A2A",minHeight:48}}
+            />
+            <span style={{fontSize:"1rem",color:"var(--inkl)"}}>minutes</span>
+            <span style={{fontSize:".72rem",color:"var(--mu)",marginLeft:"auto"}}>default: {parseDur(task.duration||"")/60||"—"} min</span>
+          </div>
+        </div>
+        <div className="confirm-btns" style={{marginTop:10}}>
+          <button className="cbtn" style={{background:"#4A6B4A",color:"white",fontWeight:600}} onClick={()=>onConfirm(mins)}>✓ Complete — {mins} min</button>
+          <button className="cbtn cbtn-cancel" onClick={onCancel}>Cancel</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+
+function RemoveConfirmSheet({task,open,onSkip,onRemove,onCancel,skipComment,onSkipCommentChange}){
+  const[showComment,setShowComment]=useState(false);
+  useEffect(()=>{if(open)setShowComment(false);},[open,task?.id]);
+  if(!task)return null;
+  return(
+    <>
+      <div className={`shov${open?" open":""}`} onClick={onCancel} style={{zIndex:301}}/>
+      <div className={`confirm-sheet${open?" open":""}`}>
+        <div className="shh"/>
+        <div className="confirm-title">Remove "{task.name}"?</div>
+        <div className="confirm-sub">Choose how to handle this task.</div>
+        <div className="confirm-btns">
+          {!showComment?(
+            <button className="cbtn cbtn-skip" onClick={()=>setShowComment(true)}>
+              <div style={{fontWeight:600,marginBottom:2}}>Skip today only</div>
+              <div style={{fontSize:".72rem",opacity:.8}}>Comes back tomorrow · tap to add a reason</div>
+            </button>
+          ):(
+            <div style={{background:"rgba(122,98,48,.08)",border:"1px solid rgba(122,98,48,.2)",borderRadius:11,padding:12}}>
+              <div style={{fontSize:".75rem",fontWeight:600,color:"#7A6230",marginBottom:8}}>Reason for skipping (optional)</div>
+              <textarea
+                className="stx"
+                value={skipComment}
+                onChange={e=>onSkipCommentChange(e.target.value)}
+                placeholder="e.g. Back hurts, feeling depleted, short on time..."
+                rows={3}
+                style={{marginBottom:8}}
+              />
+              <div style={{display:"flex",gap:7}}>
+                <button className="cbtn cbtn-cancel" style={{flex:"0 0 auto",padding:"9px 14px"}} onClick={()=>setShowComment(false)}>Back</button>
+                <button className="cbtn cbtn-skip" style={{flex:1,padding:"9px 14px"}} onClick={()=>onSkip(task,skipComment)}>Confirm Skip</button>
+              </div>
+            </div>
+          )}
+          <button className="cbtn cbtn-remove" onClick={()=>onRemove(task)}>
+            <div style={{fontWeight:600,marginBottom:2}}>Remove from schedule</div>
+            <div style={{fontSize:".72rem",opacity:.8}}>Hidden every day until you re-add it from the library</div>
+          </button>
+          <button className="cbtn cbtn-cancel" onClick={onCancel}>Cancel</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 const MENU=[
   {id:"today",label:"Today",icon:"🗓"},
   {id:"weekly",label:"Weekly Summary",icon:"📈"},
@@ -1101,6 +1284,8 @@ function App(){
   const[blockOpen,setBlockOpen]=useState(()=>lsGet("blockState",{morning:true,midday:true,afternoon:false,evening:false,winddown:false,night:false}));
 
   const{allTasks,resolvedTasks,customTasks,customSupps,updateTask,addCustomTask,addCustomSupp,updateCustomSupp,deleteCustomSupp,archiveTask,restoreTask,overrides}=useTaskLibrary();
+  const[removeConfirm,setRemoveConfirm]=useState(null);
+  const[skipComment,setSkipComment]=useState("");
 
   const today=todayStr();
   const minDate=fmtDate(new Date(Date.now()-7*86400000));
@@ -1119,9 +1304,26 @@ function App(){
 
   const upd=nd=>{const u={...allData,[date]:nd};setAllData(u);saveDay(date,nd);};
   
+  const[durPromptTask,setDurPromptTask]=useState(null);
+  const[pendingCompleteId,setPendingCompleteId]=useState(null);
+
   const complete=id=>{
+    const task=allTasks.find(t=>t.id===id)||flatTodayTasks.find(t=>t.id===id);
+    const hasDuration=task&&task.duration&&task.duration!=="—"&&task.category!=="supplements"&&!task.noTimer;
+    if(hasDuration){
+      setPendingCompleteId(id);
+      setDurPromptTask(task);
+    } else {
+      completeNow(id,null);
+    }
+  };
+
+  const completeNow=(id,durationMins)=>{
     const now=fmtTime(new Date());
-    upd({...dayData,completed:{...dayData.completed,[id]:true},times:{...dayData.times,[id]:now}});
+    const durations={...dayData.durations};
+    if(durationMins!==null&&durationMins!==undefined)durations[id]=durationMins;
+    upd({...dayData,completed:{...dayData.completed,[id]:true},times:{...dayData.times,[id]:now},durations});
+    setDurPromptTask(null);setPendingCompleteId(null);
   };
   const undo=id=>{
     const c={...dayData.completed};const t={...dayData.times};
@@ -1146,27 +1348,78 @@ function App(){
   };
 
   // Tasks shown in today — all active tasks + any one-time additions
-  const todayExtraKey="todayExtras_"+date;
-  const[todayExtras,setTodayExtras]=useState(()=>lsGet(todayExtraKey,[]));
-  useEffect(()=>{setTodayExtras(lsGet(todayExtraKey,[]));},[ date]);
+  const[todayExtras,setTodayExtras]=useState({});
+
+  useEffect(()=>{
+    const all={};
+    for(let i=0;i<8;i++){
+      const d=fmtDate(new Date(Date.now()-i*86400000));
+      const extras=lsGet("todayExtras_"+d,[]);
+      if(extras.length>0)all[d]=extras;
+    }
+    setTodayExtras(all);
+  },[]);
 
   const addToToday=(task)=>{
-    // Mark as a one-time addition for today — place at top of its block
-    const extras=lsGet(todayExtraKey,[]);
-    if(!extras.find(e=>e.id===task.id)){
-      const updated=[task,...extras];
-      lsSet(todayExtraKey,updated);
-      setTodayExtras(updated);
+    const key="todayExtras_"+date;
+    const existing=lsGet(key,[]);
+    // Each addition gets a unique instance id — same task can be added multiple times
+    const instance={...task,instanceId:task.id+"_"+Date.now(),isExtra:true};
+    const updated=[instance,...existing];
+    lsSet(key,updated);
+    setTodayExtras(prev=>({...prev,[date]:updated}));
+    setSec("today");
+  };
+
+  const removeFromToday=(task)=>{
+    if(task.isExtra&&task.instanceId){
+      const key="todayExtras_"+date;
+      const existing=lsGet(key,[]);
+      const updated=existing.filter(t=>t.instanceId!==task.instanceId);
+      lsSet(key,updated);
+      setTodayExtras(prev=>({...prev,[date]:updated}));
+      const c={...dayData.completed};const t2={...dayData.times};
+      delete c[task.id];delete t2[task.id];
+      upd({...dayData,completed:c,times:t2});
+    } else {
+      setSkipComment("");
+      setRemoveConfirm(task);
     }
   };
 
-  // Build visible task list for today
+  const skipToday=(task,comment)=>{
+    const removed=[...(dayData.removed||[])];
+    if(!removed.includes(task.id))removed.push(task.id);
+    const comments={...dayData.comments};
+    if(comment&&comment.trim())comments["skip_"+task.id]=comment.trim();
+    upd({...dayData,removed,comments});
+    setRemoveConfirm(null);
+    setSkipComment("");
+  };
+
+  const removeForever=(task)=>{
+    updateTask(task.id,{archived:true});
+    setRemoveConfirm(null);
+    setSkipComment("");
+  };
+
+  // Build visible task list for today — supports multi-block tasks
+  const removedToday=dayData.removed||[];
   const todayTasks=BLOCKS.reduce((acc,block)=>{
-    const blockExtras=todayExtras.filter(t=>t.block===block.id);
-    const regularTasks=allTasks.filter(t=>t.block===block.id&&!t.hidden&&!t.archived);
-    // Merge: extras at top, no duplicates
-    const seen=new Set(blockExtras.map(t=>t.id));
-    const merged=[...blockExtras,...regularTasks.filter(t=>!seen.has(t.id))];
+    const extrasForDate=todayExtras[date]||[];
+    const blockExtras=extrasForDate
+      .filter(t=>t.block===block.id)
+      .map(t=>({...t,id:t.instanceId||t.id}));
+    // A task appears in a block if its blocks array includes this block id
+    const regularTasks=allTasks.filter(t=>{
+      if(t.hidden||t.archived)return false;
+      if(removedToday.includes(t.id))return false;
+      // inSchedule: default true for built-ins, respect flag for custom
+      if(t.inSchedule===false)return false;
+      const taskBlocks=getBlocks(t);
+      return taskBlocks.includes(block.id);
+    });
+    const merged=sortTasks([...blockExtras,...regularTasks]);
     return{...acc,[block.id]:merged};
   },{});
 
@@ -1240,9 +1493,10 @@ function App(){
                 onToggle={()=>toggleBlock(block.id)}
                 onComplete={complete}
                 onUndo={undo}
-                onSheet={task=>{setSheet(task);setComment(dayData.comments?.[task.id]||"");setSheetTime(dayData.times?.[task.id]||"");}}
+                onSheet={task=>{setSheet(task);setComment(dayData.comments?.[task.id]||"");setSheetTime(dayData.times?.[task.id]||fmtTime(new Date()));}}
                 onSymChange={symChange}
                 onSymSave={symSave}
+                onRemove={removeFromToday}
               />
             ))}
           </>}
@@ -1253,7 +1507,7 @@ function App(){
           {sec==="breathwork"&&<BwTab allTasks={allTasks} onAddToday={addToToday} onEditTask={handleEditTask}/>}
           {sec==="bodywork"&&<BodyTab allTasks={allTasks} onAddToday={addToToday} onEditTask={handleEditTask}/>}
           {sec==="dinacharya"&&<DinaTab allTasks={allTasks} onAddToday={addToToday} onEditTask={handleEditTask}/>}
-          {sec==="supplements"&&<SupplementsTab allTasks={allTasks} customSupps={customSupps} onAdd={addCustomSupp} onUpdate={updateCustomSupp} onDelete={deleteCustomSupp} onEditTask={handleEditTask}/>}
+          {sec==="supplements"&&<SupplementsTab allTasks={allTasks} customSupps={customSupps} onAdd={addCustomSupp} onUpdate={updateCustomSupp} onDelete={deleteCustomSupp} onEditTask={handleEditTask} onAddToday={addToToday}/>}
           {sec==="scent-sound"&&<ScentSoundTab/>}
           {sec==="ayurveda"&&<AyuTab/>}
           {sec==="settings"&&<SetTab allData={allData} customSupps={customSupps} taskOverrides={overrides} customTasks={customTasks}/>}
@@ -1270,6 +1524,21 @@ function App(){
           time={sheetTime}
           onTimeChange={setSheetTime}
           allTasks={allTasks}
+        />
+        <RemoveConfirmSheet
+          task={removeConfirm}
+          open={!!removeConfirm}
+          onSkip={skipToday}
+          onRemove={removeForever}
+          onCancel={()=>{setRemoveConfirm(null);setSkipComment("");}}
+          skipComment={skipComment}
+          onSkipCommentChange={setSkipComment}
+        />
+        <DurationPrompt
+          task={durPromptTask}
+          open={!!durPromptTask}
+          onConfirm={mins=>completeNow(pendingCompleteId,mins)}
+          onCancel={()=>{setDurPromptTask(null);setPendingCompleteId(null);}}
         />
       </div>
     </>
