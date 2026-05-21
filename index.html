@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <meta name="apple-mobile-web-app-title" content="Protocol"/>
-<meta name="theme-color" content="#F5EFE4"/>
+<meta name="theme-color" content="#F0E8DC"/>
 <title>Nelson's Protocol</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -17,69 +17,78 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 html,body,#root{height:100%;width:100%;overflow-x:hidden}
-body{font-family:'Jost',sans-serif;background:#F5EFE4;color:#2A2018;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+body{font-family:'Jost',sans-serif;background:#F0E8DC;color:#241C14;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+input,textarea,select{font-family:'Jost',sans-serif}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const{useState,useEffect,useRef}=React;
+const{useState,useEffect,useRef,useCallback}=React;
 
-const CATS={
-  tracking:{label:"Tracking",color:"#7B9E87",icon:"📊"},
-  diet:{label:"Diet",color:"#C4724A",icon:"🍲"},
-  bodywork:{label:"Bodywork",color:"#A0785A",icon:"🤲"},
-  movement:{label:"Movement",color:"#6B8F6B",icon:"🌿"},
-  breathwork:{label:"Breathwork",color:"#7A9BB5",icon:"🌬"},
-  supplements:{label:"Supplements",color:"#B5924A",icon:"💊"},
-  dinacharya:{label:"Dinacharya",color:"#9B8BB4",icon:"🕯"},
+// ─── PALETTE ────────────────────────────────────────────────────────────────
+const PRI_COLORS={
+  mandatory:  {panel:"#8B4A2A",label:"Mandatory"},
+  recommended:{panel:"#7A6230",label:"Recommended"},
+  optional:   {panel:"#6A5A48",label:"Optional"},
 };
-const PRI={mandatory:"Mandatory",recommended:"Recommended",optional:"Optional"};
+const CAT_COLORS={
+  breathwork: {bg:"#D6E4ED",icon:"🌬",label:"Breathwork"},
+  movement:   {bg:"#D4E4D4",icon:"🌿",label:"Movement"},
+  bodywork:   {bg:"#E8DDD0",icon:"🤲",label:"Bodywork"},
+  supplements:{bg:"#E8E0CC",icon:"💊",label:"Supplements"},
+  diet:       {bg:"#EDD9C8",icon:"🍲",label:"Diet"},
+  tracking:   {bg:"#D4DDD6",icon:"📊",label:"Tracking"},
+  dinacharya: {bg:"#DED8E8",icon:"🕯",label:"Dinacharya"},
+};
+const DONE_PANEL="#4A6B4A";
+const DONE_BG="rgba(160,195,160,0.22)";
 
-const TASKS=[
-  {id:"sym-morning",block:"morning",name:"Morning Symptom Log",instruction:"Log HRV, RHR & sleep quality",category:"tracking",priority:"mandatory",duration:"2 min",substitutions:[],videos:[]},
-  {id:"tongue-scrape",block:"morning",name:"Tongue Scrape",instruction:"5–7 gentle forward strokes",category:"bodywork",priority:"mandatory",duration:"1 min",substitutions:[],videos:["https://www.youtube.com/watch?v=HlhPcwR7SZs"]},
-  {id:"warm-water",block:"morning",name:"Warm Water + Ginger/Lemon",instruction:"Drink before anything else",category:"diet",priority:"mandatory",duration:"2 min",substitutions:["plain-warm-water"],videos:[]},
-  {id:"plain-warm-water",block:"morning",name:"Plain Warm Water",instruction:"Alternative to ginger/lemon",category:"diet",priority:"optional",duration:"1 min",substitutions:[],videos:[],hidden:true},
-  {id:"mag-morning",block:"morning",name:"Magnesium — Morning",instruction:"Take with first glass of water",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[]},
-  {id:"abhyanga-full",block:"morning",name:"Abhyanga — Full Body",instruction:"Warm sesame oil, stroke to heart",category:"bodywork",priority:"recommended",duration:"20 min",substitutions:["abhyanga-partial"],videos:["https://www.youtube.com/watch?v=FNSohGJjgQA","https://www.youtube.com/watch?v=1yAg9e7BQec"]},
-  {id:"abhyanga-partial",block:"morning",name:"Abhyanga — Partial",instruction:"Neck, shoulders and feet only",category:"bodywork",priority:"optional",duration:"10 min",substitutions:["foot-oil"],videos:["https://www.youtube.com/watch?v=FNSohGJjgQA"],hidden:true},
-  {id:"morning-correctives",block:"morning",name:"Morning Correctives",instruction:"Corrective sequence pre-breakfast",category:"movement",priority:"mandatory",duration:"15 min",substitutions:["morning-walk"],videos:["https://www.youtube.com/watch?v=RqcOCBb4arc"]},
-  {id:"morning-walk",block:"morning",name:"Gentle Morning Walk",instruction:"Easy pace, 10 min outdoors",category:"movement",priority:"optional",duration:"10 min",substitutions:[],videos:[],hidden:true},
-  {id:"nadi-morning",block:"morning",name:"Nadi Shodhana — Morning",instruction:"5 rounds alternate nostril",category:"breathwork",priority:"recommended",duration:"5 min",substitutions:["exhale-breathing"],videos:["https://www.youtube.com/watch?v=8VwufJrUhic","https://www.youtube.com/watch?v=Qnd6ACoLKlk"]},
-  {id:"exhale-breathing",block:"morning",name:"Extended Exhale Breathing",instruction:"Inhale 4, exhale 6–8 counts",category:"breathwork",priority:"optional",duration:"5 min",substitutions:[],videos:["https://www.youtube.com/watch?v=tybOi4hjZFQ"],hidden:true},
-  {id:"breakfast",block:"morning",name:"Warm Breakfast",instruction:"Warm, cooked, with ghee",category:"diet",priority:"mandatory",duration:"—",substitutions:[],videos:[]},
-  {id:"ginsenol",block:"morning",name:"Ginsenol",instruction:"Take with breakfast",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[]},
-  {id:"citicoline",block:"morning",name:"Citicoline",instruction:"Take with breakfast",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[]},
-  {id:"b2",block:"morning",name:"B2",instruction:"Take with breakfast",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[]},
-  {id:"main-meal",block:"midday",name:"Main Meal",instruction:"Largest meal, no screens",category:"diet",priority:"mandatory",duration:"—",substitutions:[],videos:[]},
-  {id:"b-complex",block:"midday",name:"B-Complex",instruction:"Take with lunch",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[]},
-  {id:"post-lunch-walk",block:"midday",name:"Post-Lunch Walk",instruction:"Easy pace, 10 min outdoors",category:"movement",priority:"recommended",duration:"10 min",substitutions:["standing-stretch"],videos:[]},
-  {id:"standing-stretch",block:"midday",name:"Standing Stretch",instruction:"5 min gentle standing stretch",category:"movement",priority:"optional",duration:"5 min",substitutions:[],videos:[],hidden:true},
-  {id:"sym-midday",block:"midday",name:"Midday Symptom Log",instruction:"Fog, energy, tension, headache",category:"tracking",priority:"mandatory",duration:"2 min",substitutions:[],videos:[]},
-  {id:"hydration",block:"afternoon",name:"Hydration Check",instruction:"Aim for consistent sipping",category:"diet",priority:"recommended",duration:"—",substitutions:[],videos:[]},
-  {id:"tulsi-afternoon",block:"afternoon",name:"Tulsi Tea",instruction:"Brew 5 min, drink warm",category:"supplements",priority:"optional",duration:"—",substitutions:["herbal-tea"],videos:[]},
-  {id:"herbal-tea",block:"afternoon",name:"Herbal Tea",instruction:"Any calming herbal tea",category:"supplements",priority:"optional",duration:"—",substitutions:[],videos:[],hidden:true},
-  {id:"light-dinner",block:"evening",name:"Light Dinner",instruction:"Soup, stew or kitchari",category:"diet",priority:"mandatory",duration:"—",substitutions:[],videos:[]},
-  {id:"ergyphilus",block:"evening",name:"Ergyphilus Plus Defens",instruction:"2 caps, 15–20 min before dinner",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[]},
-  {id:"digest-gold",block:"evening",name:"Digest Gold",instruction:"1 tab with dinner",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[]},
-  {id:"omega3",block:"evening",name:"Omega-3 / Cod Liver Oil",instruction:"5ml with dinner",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[]},
-  {id:"heating-device",block:"evening",name:"Heating Device — Neck",instruction:"Warm neck/shoulders 20 min",category:"bodywork",priority:"recommended",duration:"20 min",substitutions:["hot-shower-neck"],videos:[]},
-  {id:"hot-shower-neck",block:"evening",name:"Hot Shower on Neck",instruction:"Direct warm water on neck/traps",category:"bodywork",priority:"optional",duration:"10 min",substitutions:[],videos:[],hidden:true},
-  {id:"dim-lights",block:"winddown",name:"Dim the Lights",instruction:"Switch to lamps or candles",category:"dinacharya",priority:"recommended",duration:"—",substitutions:[],videos:[]},
-  {id:"yin-yoga",block:"winddown",name:"Yin Yoga",instruction:"Slow holds, passive, warm room",category:"movement",priority:"recommended",duration:"25 min",substitutions:["extra-breathwork"],videos:["https://www.youtube.com/watch?v=vc0CQpnNUGU","https://www.youtube.com/watch?v=M_YqLkzLPLs","https://www.youtube.com/watch?v=ULHbH3V1GsQ"]},
-  {id:"extra-breathwork",block:"winddown",name:"Extra Breathwork Session",instruction:"Nadi Shodhana + Bhramari",category:"breathwork",priority:"optional",duration:"15 min",substitutions:[],videos:["https://www.youtube.com/watch?v=8VwufJrUhic"],hidden:true},
-  {id:"nadi-evening",block:"winddown",name:"Nadi Shodhana — Evening",instruction:"10 rounds, extended exhale",category:"breathwork",priority:"mandatory",duration:"10 min",substitutions:["bhramari-exhale"],videos:["https://www.youtube.com/watch?v=8VwufJrUhic","https://www.youtube.com/watch?v=Qnd6ACoLKlk"]},
-  {id:"bhramari-exhale",block:"winddown",name:"Bhramari + Extended Exhale",instruction:"5–7 rounds humming breath",category:"breathwork",priority:"optional",duration:"10 min",substitutions:[],videos:["https://www.youtube.com/watch?v=BbA4tchCEpg"],hidden:true},
-  {id:"bhramari",block:"winddown",name:"Bhramari",instruction:"5–7 rounds humming breath",category:"breathwork",priority:"recommended",duration:"5 min",substitutions:["ujjayi"],videos:["https://www.youtube.com/watch?v=BbA4tchCEpg"]},
-  {id:"ujjayi",block:"winddown",name:"Ujjayi Breathing",instruction:"Soft ocean sound, gentle throat",category:"breathwork",priority:"optional",duration:"5 min",substitutions:[],videos:["https://www.youtube.com/watch?v=tybOi4hjZFQ"],hidden:true},
-  {id:"mag-evening",block:"winddown",name:"Magnesium — Evening",instruction:"Take with small glass of water",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[]},
-  {id:"foot-oil",block:"winddown",name:"Foot Oil",instruction:"Warm sesame, wear socks after",category:"bodywork",priority:"recommended",duration:"5 min",substitutions:[],videos:[]},
-  {id:"sym-evening",block:"winddown",name:"Evening Symptom Log",instruction:"Fog, energy, mood, tension",category:"tracking",priority:"mandatory",duration:"3 min",substitutions:[],videos:[]},
-  {id:"warm-drink-night",block:"night",name:"Warm Herbal Drink",instruction:"Tulsi or warm milk + cardamom",category:"diet",priority:"recommended",duration:"—",substitutions:["warm-honey-water"],videos:[]},
-  {id:"warm-honey-water",block:"night",name:"Warm Water + Honey",instruction:"Warm water with raw honey",category:"diet",priority:"optional",duration:"—",substitutions:[],videos:[],hidden:true},
-  {id:"valmel",block:"night",name:"Valmel Flow",instruction:"Take before sleep",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[]},
-  {id:"sleep-anchor",block:"night",name:"Sleep — Lights Out",instruction:"In bed, no screens by 22:30",category:"dinacharya",priority:"mandatory",duration:"—",substitutions:[],videos:[]},
+// ─── DEFAULT TASK LIBRARY ───────────────────────────────────────────────────
+const DEFAULT_TASKS=[
+  {id:"sym-morning",block:"morning",name:"Morning Symptom Log",instruction:"Log HRV, RHR & sleep quality",category:"tracking",priority:"mandatory",duration:"2 min",substitutions:[],videos:[],scent:null,sound:null},
+  {id:"tongue-scrape",block:"morning",name:"Tongue Scrape",instruction:"5–7 gentle forward strokes",category:"bodywork",priority:"mandatory",duration:"1 min",substitutions:[],videos:["https://www.youtube.com/watch?v=HlhPcwR7SZs"],scent:null,sound:null},
+  {id:"warm-water",block:"morning",name:"Warm Water + Ginger/Lemon",instruction:"Drink before anything else",category:"diet",priority:"mandatory",duration:"2 min",substitutions:["plain-warm-water"],videos:[],scent:null,sound:null},
+  {id:"plain-warm-water",block:"morning",name:"Plain Warm Water",instruction:"Alternative to ginger/lemon",category:"diet",priority:"optional",duration:"1 min",substitutions:[],videos:[],scent:null,sound:null,hidden:true},
+  {id:"mag-morning",block:"morning",name:"Magnesium — Morning",instruction:"Take with first glass of water",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[],scent:null,sound:null,noTimer:true},
+  {id:"abhyanga-full",block:"morning",name:"Abhyanga — Full Body",instruction:"Warm sesame oil, stroke to heart",category:"bodywork",priority:"recommended",duration:"20 min",substitutions:["abhyanga-partial"],videos:["https://www.youtube.com/watch?v=FNSohGJjgQA","https://www.youtube.com/watch?v=1yAg9e7BQec"],scent:"Sandalwood or vetiver",sound:"Singing bowl recording"},
+  {id:"abhyanga-partial",block:"morning",name:"Abhyanga — Partial",instruction:"Neck, shoulders and feet only",category:"bodywork",priority:"optional",duration:"10 min",substitutions:["foot-oil"],videos:["https://www.youtube.com/watch?v=FNSohGJjgQA"],scent:"Sandalwood or vetiver",sound:"Singing bowl recording",hidden:true},
+  {id:"morning-correctives",block:"morning",name:"Morning Correctives",instruction:"Corrective sequence pre-breakfast",category:"movement",priority:"mandatory",duration:"15 min",substitutions:["morning-walk"],videos:["https://www.youtube.com/watch?v=RqcOCBb4arc"],scent:"Cardamom or frankincense",sound:"Raga Bhairav or nature sounds"},
+  {id:"morning-walk",block:"morning",name:"Gentle Morning Walk",instruction:"Easy pace, 10 min outdoors",category:"movement",priority:"optional",duration:"10 min",substitutions:[],videos:[],scent:null,sound:null,hidden:true},
+  {id:"nadi-morning",block:"morning",name:"Nadi Shodhana — Morning",instruction:"5 rounds alternate nostril",category:"breathwork",priority:"recommended",duration:"5 min",substitutions:["exhale-breathing"],videos:["https://www.youtube.com/watch?v=8VwufJrUhic","https://www.youtube.com/watch?v=Qnd6ACoLKlk"],scent:"Frankincense — diffuse or direct inhale",sound:"Silence or soft singing bowl"},
+  {id:"exhale-breathing",block:"morning",name:"Extended Exhale Breathing",instruction:"Inhale 4, exhale 6–8 counts",category:"breathwork",priority:"optional",duration:"5 min",substitutions:[],videos:["https://www.youtube.com/watch?v=tybOi4hjZFQ"],scent:null,sound:null,hidden:true},
+  {id:"breakfast",block:"morning",name:"Warm Breakfast",instruction:"Warm, cooked, with ghee",category:"diet",priority:"mandatory",duration:"—",substitutions:[],videos:[],scent:null,sound:null},
+  {id:"ginsenol",block:"morning",name:"Ginsenol",instruction:"Take with breakfast",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[],scent:null,sound:null,noTimer:true},
+  {id:"citicoline",block:"morning",name:"Citicoline",instruction:"Take with breakfast",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[],scent:null,sound:null,noTimer:true},
+  {id:"b2",block:"morning",name:"B2",instruction:"Take with breakfast",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[],scent:null,sound:null,noTimer:true},
+  {id:"main-meal",block:"midday",name:"Main Meal",instruction:"Largest meal, no screens",category:"diet",priority:"mandatory",duration:"—",substitutions:[],videos:[],scent:null,sound:null},
+  {id:"b-complex",block:"midday",name:"B-Complex",instruction:"Take with lunch",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[],scent:null,sound:null,noTimer:true},
+  {id:"post-lunch-walk",block:"midday",name:"Post-Lunch Walk",instruction:"Easy pace, 10 min outdoors",category:"movement",priority:"recommended",duration:"10 min",substitutions:["standing-stretch"],videos:[],scent:null,sound:null},
+  {id:"standing-stretch",block:"midday",name:"Standing Stretch",instruction:"5 min gentle standing stretch",category:"movement",priority:"optional",duration:"5 min",substitutions:[],videos:[],scent:null,sound:null,hidden:true},
+  {id:"sym-midday",block:"midday",name:"Midday Symptom Log",instruction:"Fog, energy, tension, headache",category:"tracking",priority:"mandatory",duration:"2 min",substitutions:[],videos:[],scent:null,sound:null},
+  {id:"hydration",block:"afternoon",name:"Hydration Check",instruction:"Aim for consistent sipping",category:"diet",priority:"recommended",duration:"—",substitutions:[],videos:[],scent:null,sound:null},
+  {id:"tulsi-afternoon",block:"afternoon",name:"Tulsi Tea",instruction:"Brew 5 min, drink warm",category:"supplements",priority:"optional",duration:"—",substitutions:["herbal-tea"],videos:[],scent:null,sound:null,noTimer:true},
+  {id:"herbal-tea",block:"afternoon",name:"Herbal Tea",instruction:"Any calming herbal tea",category:"supplements",priority:"optional",duration:"—",substitutions:[],videos:[],scent:null,sound:null,hidden:true,noTimer:true},
+  {id:"light-dinner",block:"evening",name:"Light Dinner",instruction:"Soup, stew or kitchari",category:"diet",priority:"mandatory",duration:"—",substitutions:[],videos:[],scent:null,sound:null},
+  {id:"ergyphilus",block:"evening",name:"Ergyphilus Plus Defens",instruction:"2 caps, 15–20 min before dinner",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[],scent:null,sound:null,noTimer:true},
+  {id:"digest-gold",block:"evening",name:"Digest Gold",instruction:"1 tab with dinner",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[],scent:null,sound:null,noTimer:true},
+  {id:"omega3",block:"evening",name:"Omega-3 / Cod Liver Oil",instruction:"5ml with dinner",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[],scent:null,sound:null,noTimer:true},
+  {id:"heating-device",block:"evening",name:"Heating Device — Neck",instruction:"Warm neck/shoulders 20 min",category:"bodywork",priority:"recommended",duration:"20 min",substitutions:["hot-shower-neck"],videos:[],scent:null,sound:null},
+  {id:"hot-shower-neck",block:"evening",name:"Hot Shower on Neck",instruction:"Direct warm water on neck/traps",category:"bodywork",priority:"optional",duration:"10 min",substitutions:[],videos:[],scent:null,sound:null,hidden:true},
+  {id:"dim-lights",block:"winddown",name:"Dim the Lights",instruction:"Switch to lamps or candles",category:"dinacharya",priority:"recommended",duration:"—",substitutions:[],videos:[],scent:null,sound:null},
+  {id:"yin-yoga",block:"winddown",name:"Yin Yoga",instruction:"Slow holds, passive, warm room",category:"movement",priority:"recommended",duration:"25 min",substitutions:["extra-breathwork"],videos:["https://www.youtube.com/watch?v=vc0CQpnNUGU","https://www.youtube.com/watch?v=M_YqLkzLPLs","https://www.youtube.com/watch?v=ULHbH3V1GsQ"],scent:"Sandalwood or vetiver — diffuse",sound:"Raga Yaman or singing bowls"},
+  {id:"extra-breathwork",block:"winddown",name:"Extra Breathwork Session",instruction:"Nadi Shodhana + Bhramari",category:"breathwork",priority:"optional",duration:"15 min",substitutions:[],videos:["https://www.youtube.com/watch?v=8VwufJrUhic"],scent:null,sound:null,hidden:true},
+  {id:"nadi-evening",block:"winddown",name:"Nadi Shodhana — Evening",instruction:"10 rounds, extended exhale",category:"breathwork",priority:"mandatory",duration:"10 min",substitutions:["bhramari-exhale"],videos:["https://www.youtube.com/watch?v=8VwufJrUhic","https://www.youtube.com/watch?v=Qnd6ACoLKlk"],scent:"Frankincense or sandalwood",sound:"Silence or soft singing bowl"},
+  {id:"bhramari-exhale",block:"winddown",name:"Bhramari + Extended Exhale",instruction:"5–7 rounds humming breath",category:"breathwork",priority:"optional",duration:"10 min",substitutions:[],videos:["https://www.youtube.com/watch?v=BbA4tchCEpg"],scent:null,sound:null,hidden:true},
+  {id:"bhramari",block:"winddown",name:"Bhramari",instruction:"5–7 rounds humming breath",category:"breathwork",priority:"recommended",duration:"5 min",substitutions:["ujjayi"],videos:["https://www.youtube.com/watch?v=BbA4tchCEpg"],scent:"Frankincense — direct inhale before",sound:"You are the sound — silence around you"},
+  {id:"ujjayi",block:"winddown",name:"Ujjayi Breathing",instruction:"Soft ocean sound, gentle throat",category:"breathwork",priority:"optional",duration:"5 min",substitutions:[],videos:["https://www.youtube.com/watch?v=tybOi4hjZFQ"],scent:null,sound:null,hidden:true},
+  {id:"mag-evening",block:"winddown",name:"Magnesium — Evening",instruction:"Take with small glass of water",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[],scent:null,sound:null,noTimer:true},
+  {id:"foot-oil",block:"winddown",name:"Foot Oil",instruction:"Warm sesame, wear socks after",category:"bodywork",priority:"recommended",duration:"5 min",substitutions:[],videos:[],scent:"Vetiver — 1 drop in sesame oil",sound:"Nature sounds or silence"},
+  {id:"sym-evening",block:"winddown",name:"Evening Symptom Log",instruction:"Fog, energy, mood, tension",category:"tracking",priority:"mandatory",duration:"3 min",substitutions:[],videos:[],scent:null,sound:null},
+  {id:"warm-drink-night",block:"night",name:"Warm Herbal Drink",instruction:"Tulsi or warm milk + cardamom",category:"diet",priority:"recommended",duration:"—",substitutions:["warm-honey-water"],videos:[],scent:null,sound:null},
+  {id:"warm-honey-water",block:"night",name:"Warm Water + Honey",instruction:"Warm water with raw honey",category:"diet",priority:"optional",duration:"—",substitutions:[],videos:[],scent:null,sound:null,hidden:true},
+  {id:"valmel",block:"night",name:"Valmel Flow",instruction:"Take before sleep",category:"supplements",priority:"mandatory",duration:"1 min",substitutions:[],videos:[],scent:null,sound:null,noTimer:true},
+  {id:"sleep-anchor",block:"night",name:"Sleep — Lights Out",instruction:"In bed, no screens by 22:30",category:"dinacharya",priority:"mandatory",duration:"—",substitutions:[],videos:[],scent:null,sound:null},
 ];
 
 const BLOCKS=[
@@ -91,212 +100,406 @@ const BLOCKS=[
   {id:"night",label:"Night",time:"22:00 – 22:30",emoji:"✨"},
 ];
 
-const HERBS=[
-  {name:"Triphala",dose:"½ tsp powder",timing:"Before bed",purpose:"Gentle gut tonic, lymphatic support, removes Ama. Balances all three doshas."},
-  {name:"Ashwagandha",dose:"300–600mg",timing:"Evening after food",purpose:"Primary Vata-Kapha tonic. HPA axis support, nervous tissue rebuilding, anabolic recovery."},
-  {name:"Brahmi (Bacopa)",dose:"300mg extract",timing:"Morning with breakfast",purpose:"Prana Vata herb. Cognitive clarity, memory, nervous system calming without sedation."},
-  {name:"Shatavari",dose:"500mg",timing:"Evening with Ashwagandha",purpose:"Tissue rebuilding herb. Plasma, lymph, and gut lining support."},
-];
-
-const DIET={
-  eatMore:["Ghee — daily in cooking or stirred into grains","Sweet potato and root vegetables","Mung dal with cumin, ginger, ghee","White basmati rice","Soaked almonds and walnuts (overnight)","Oily fish — salmon, sardines, mackerel","Cooked leafy greens with oil","Dates and figs","Warm spiced oats","Fresh ginger tea with meals"],
-  avoid:["Raw cold salads (especially mornings)","Cold drinks and food from fridge","Cruciferous veg in large amounts","Most beans except mung dal","Popcorn, crackers, dry cereals","Caffeine on empty stomach","Gluten and dairy (trial elimination)","Refined sugar","Carbonated drinks","Alcohol"],
-  spices:["Cumin — best for Vata digestion","Ginger — kindles Agni, anti-inflammatory","Fennel — calms gut, reduces bloating","Cardamom — Vata-pacifying","Turmeric + black pepper — anti-inflammatory"],
-};
-
-const SDESC={
-  "mag-morning":{n:"Magnesium — Morning",t:"With first water",p:"Nervous system calming, HPA axis support, muscle relaxation. Critical cofactor depleted by stress."},
-  "mag-evening":{n:"Magnesium — Evening",t:"Before bed",p:"Supports sleep onset and overnight muscle recovery. Glycinate or threonate preferred."},
-  "ginsenol":{n:"Ginsenol (Ginseng)",t:"Breakfast",p:"Adaptogenic support, energy regulation, cognitive performance, HPA axis modulation."},
-  "citicoline":{n:"Citicoline",t:"Breakfast",p:"Cognitive support, acetylcholine precursor, neuroprotective. Targets brain fog and cognitive clarity."},
-  "b2":{n:"Vitamin B2 (Riboflavin)",t:"Breakfast",p:"Mitochondrial energy production, cofactor for methylation. Relevant to MTHFR hypothesis."},
-  "b-complex":{n:"B-Complex",t:"Lunch",p:"Full B vitamin support for methylation, energy metabolism, and neurotransmitter synthesis."},
-  "ergyphilus":{n:"Ergyphilus Plus Defens",t:"15–20 min before dinner",p:"Probiotic for gut microbiome restoration. Supports mucosal immunity and gut barrier integrity."},
-  "digest-gold":{n:"Digest Gold",t:"With dinner",p:"Digestive enzyme support. Improves breakdown and absorption of nutrients at dinner."},
-  "omega3":{n:"Omega-3 / Cod Liver Oil",t:"With dinner",p:"Anti-inflammatory, nervous system nourishment, cardiovascular support, vitamins D and A."},
-  "tulsi-afternoon":{n:"Tulsi (Holy Basil) Tea",t:"Afternoon",p:"Adaptogenic, nervous system calming, lymphatic support, mild anti-inflammatory."},
-  "valmel":{n:"Valmel Flow",t:"Before sleep",p:"Pre-sleep support for relaxation and sleep onset."},
-};
+const BLOCK_IDS=BLOCKS.map(b=>b.id);
 
 const MF=[{key:"sleepQuality",label:"Sleep Quality",type:"scale"},{key:"hrv",label:"HRV",type:"number",unit:"ms"},{key:"rhr",label:"Resting Heart Rate",type:"number",unit:"bpm"},{key:"morningNotes",label:"Notes",type:"text"}];
 const DF=[{key:"fog",label:"Fog Level",type:"scale"},{key:"energy",label:"Energy Level",type:"scale"},{key:"tension",label:"Neck / Shoulder Tension",type:"scale"},{key:"headache",label:"Headache",type:"scale"},{key:"middayNotes",label:"Notes",type:"text"}];
 const EF=[{key:"eveningFog",label:"Fog Level",type:"scale"},{key:"eveningEnergy",label:"Energy Level",type:"scale"},{key:"mood",label:"Mood",type:"scale"},{key:"eveningTension",label:"Neck / Shoulder Tension",type:"scale"},{key:"eveningNotes",label:"Notes",type:"text"}];
 
-const fd=d=>d.toISOString().split("T")[0];
-const gl=ds=>{const t=fd(new Date()),y=fd(new Date(Date.now()-86400000));if(ds===t)return"Today";if(ds===y)return"Yesterday";return new Date(ds+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"});};
-const ld=d=>{try{const r=localStorage.getItem("p_"+d);return r?JSON.parse(r):{completed:{},comments:{},symptoms:{}};}catch{return{completed:{},comments:{},symptoms:{}};}};
-const sd=(d,data)=>{try{localStorage.setItem("p_"+d,JSON.stringify(data));}catch{}};
-const pd=dur=>{if(!dur||dur==="—")return 0;const m=dur.match(/(\d+)\s*min/);return m?parseInt(m[1])*60:0;};
+const HERBS=[
+  {name:"Triphala",dose:"½ tsp powder",timing:"Before bed",purpose:"Gentle gut tonic, lymphatic support, removes Ama."},
+  {name:"Ashwagandha",dose:"300–600mg",timing:"Evening after food",purpose:"Primary Vata-Kapha tonic. HPA axis support, nervous tissue rebuilding."},
+  {name:"Brahmi (Bacopa)",dose:"300mg extract",timing:"Morning with breakfast",purpose:"Cognitive clarity, memory, nervous system calming."},
+  {name:"Shatavari",dose:"500mg",timing:"Evening with Ashwagandha",purpose:"Tissue rebuilding. Plasma, lymph, gut lining support."},
+];
 
+const SCENT_DATA={
+  scents:[
+    {name:"Sandalwood",quality:"Warm, sweet, grounding",use:"Diffuser or wrists",timing:"Evening — yin yoga, Abhyanga, before sleep",benefit:"Calms mental racing, reduces anxiety. Classic Vata-pacifying."},
+    {name:"Vetiver (Khus)",quality:"Earthy, heavy, rooting",use:"Diffuser or 1 drop in sesame oil",timing:"Evening and sleep",benefit:"Specifically indicated for anxiety and nervous system exhaustion."},
+    {name:"Frankincense",quality:"Resinous, warm, deepening",use:"Diffuser or direct inhale",timing:"Breathwork sessions, acute fog",benefit:"Deepens breathing, calms nervous system, neuroinflammation reduction."},
+    {name:"Cardamom",quality:"Warm, sweet, clarifying",use:"Diffuser",timing:"Morning — correctives, breakfast window",benefit:"Stimulates Agni and mental clarity without overheating."},
+    {name:"Lavender",quality:"Floral, cool, calming",use:"Diffuser or pillow",timing:"Sleep onset",benefit:"Strong HRV improvement and cortisol reduction evidence."},
+  ],
+  sounds:[
+    {name:"SA TA NA MA",type:"Mantra",timing:"Any time — 12 min daily",benefit:"UCLA studies: reduced cortisol, improved cognition after 8 weeks.",url:"https://www.youtube.com/watch?v=jrDnBLBlB3Q"},
+    {name:"Raga Bhairav",type:"Classical raga",timing:"Morning",benefit:"Awakening, grounding, mental clarity.",url:"https://www.youtube.com/results?search_query=raga+bhairav+morning"},
+    {name:"Raga Yaman",type:"Classical raga",timing:"Evening wind-down",benefit:"Deeply settling. Perfect for yin yoga and Nadi Shodhana.",url:"https://www.youtube.com/results?search_query=raga+yaman+evening"},
+    {name:"Tibetan Singing Bowls",type:"Harmonic resonance",timing:"Abhyanga, yin yoga",benefit:"432Hz harmonics produce measurable HRV improvement.",url:"https://www.youtube.com/results?search_query=tibetan+singing+bowls+432hz"},
+    {name:"Nature Sounds",type:"Ambient",timing:"Sleep, foot oil, wind-down",benefit:"Patterned sound signals safety. Reduces Vata threat-detection priming.",url:"https://www.youtube.com/results?search_query=nature+sounds+sleep"},
+  ],
+};
+
+const DIET_DATA={
+  eatMore:["Ghee — daily in cooking or stirred into grains","Sweet potato and root vegetables","Mung dal with cumin, ginger, ghee","White basmati rice","Soaked almonds and walnuts (overnight)","Oily fish — salmon, sardines, mackerel","Cooked leafy greens with oil","Dates and figs","Warm spiced oats","Fresh ginger tea with meals"],
+  avoid:["Raw cold salads (especially mornings)","Cold drinks and food from fridge","Cruciferous veg in large amounts","Most beans except mung dal","Popcorn, crackers, dry cereals","Caffeine on empty stomach","Gluten and dairy (trial elimination)","Refined sugar","Carbonated drinks","Alcohol"],
+  spices:["Cumin — best for Vata digestion","Ginger — kindles Agni, anti-inflammatory","Fennel — calms gut, reduces bloating","Cardamom — Vata-pacifying","Turmeric + black pepper — anti-inflammatory"],
+};
+
+// ─── STORAGE HELPERS ────────────────────────────────────────────────────────
+const fmtDate=d=>d.toISOString().split("T")[0];
+const fmtTime=d=>{const h=String(d.getHours()).padStart(2,"0"),m=String(d.getMinutes()).padStart(2,"0");return`${h}:${m}`;};
+const todayStr=()=>fmtDate(new Date());
+const getLabel=ds=>{const t=todayStr(),y=fmtDate(new Date(Date.now()-86400000));if(ds===t)return"Today";if(ds===y)return"Yesterday";return new Date(ds+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"short"});};
+
+const lsGet=(k,def)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):def;}catch{return def;}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}};
+
+const loadDay=d=>lsGet("p_"+d,{completed:{},comments:{},times:{},symptoms:{}});
+const saveDay=(d,data)=>lsSet("p_"+d,data);
+
+const parseDur=dur=>{if(!dur||dur==="—")return 0;const m=dur.match(/(\d+)\s*min/);return m?parseInt(m[1])*60:0;};
+
+// ─── TASK RESOLUTION ─────────────────────────────────────────────────────────
+// Merge default tasks with user overrides stored in localStorage
+function useTaskLibrary(){
+  const[overrides,setOverrides]=useState(()=>lsGet("taskOverrides",{}));
+  const[customTasks,setCustomTasks]=useState(()=>lsGet("customTasks",[]));
+  const[customSupps,setCustomSupps]=useState(()=>lsGet("customSupplements2",[]));
+
+  const save=(ov,ct,cs)=>{
+    lsSet("taskOverrides",ov);
+    lsSet("customTasks",ct);
+    lsSet("customSupplements2",cs);
+  };
+
+  const resolvedTasks=DEFAULT_TASKS.map(t=>({...t,...(overrides[t.id]||{})}));
+  const allTasks=[...resolvedTasks,...customTasks,...customSupps.filter(s=>s.active!==false)];
+
+  const updateTask=(id,changes)=>{
+    const ov={...overrides,[id]:{...(overrides[id]||{}), ...changes}};
+    setOverrides(ov);
+    save(ov,customTasks,customSupps);
+  };
+
+  const addCustomTask=(task)=>{
+    const ct=[...customTasks,task];
+    setCustomTasks(ct);
+    save(overrides,ct,customSupps);
+  };
+
+  const addCustomSupp=(supp)=>{
+    const cs=[...customSupps,supp];
+    setCustomSupps(cs);
+    save(overrides,customTasks,cs);
+  };
+
+  const updateCustomSupp=(id,changes)=>{
+    const cs=customSupps.map(s=>s.id===id?{...s,...changes}:s);
+    setCustomSupps(cs);
+    save(overrides,customTasks,cs);
+  };
+
+  const deleteCustomSupp=(id)=>{
+    const cs=customSupps.filter(s=>s.id!==id);
+    setCustomSupps(cs);
+    save(overrides,customTasks,cs);
+  };
+
+  const archiveTask=(id)=>updateTask(id,{archived:true});
+  const restoreTask=(id)=>{
+    const ov={...overrides};
+    if(ov[id])delete ov[id].archived;
+    setOverrides(ov);
+    save(ov,customTasks,customSupps);
+  };
+
+  return{allTasks,resolvedTasks,customTasks,customSupps,updateTask,addCustomTask,addCustomSupp,updateCustomSupp,deleteCustomSupp,archiveTask,restoreTask,overrides};
+}
+
+// ─── CSS ────────────────────────────────────────────────────────────────────
 const CSS=`
-:root{--cr:#F5EFE4;--crd:#EDE4D4;--tc:#C4724A;--tcl:#D98B65;--oc:#C49A3A;--fo:#5A7A5A;--fol:#7A9B7A;--st:#9A8A78;--stl:#C4B8A8;--ink:#2A2018;--inkl:#5A4A38;--mu:#8A7A68;--sha:0 2px 16px rgba(42,32,24,.1);--r:16px;--rs:10px;--st2:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);}
-.app{max-width:480px;margin:0 auto;min-height:100dvh;background:var(--cr);}
-.topbar{position:sticky;top:0;z-index:100;background:rgba(245,239,228,.94);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding:calc(14px + var(--st2)) 20px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(196,114,74,.15);}
-.tbt{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:600;color:var(--tc);}
+:root{
+  --bg:#F0E8DC;--bg2:#E8DDD0;--ink:#241C14;--inkl:#5A4A38;--mu:#8A7A68;
+  --stl:#C8BAA8;--sha:0 2px 14px rgba(36,28,20,.09);
+  --r:13px;--rs:10px;
+  --st2:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);
+}
+.app{max-width:480px;margin:0 auto;min-height:100dvh;background:var(--bg);}
+.topbar{position:sticky;top:0;z-index:100;background:rgba(240,232,220,.95);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  padding:calc(12px + var(--st2)) 20px 12px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid rgba(139,74,42,.12);}
+.tbt{font-family:'Cormorant Garamond',serif;font-size:1.3rem;font-weight:600;color:#8B4A2A;}
 .hbtn{background:none;border:none;cursor:pointer;padding:8px;display:flex;flex-direction:column;gap:5px;}
 .hbtn span{display:block;width:22px;height:2px;background:var(--inkl);border-radius:2px;}
-.ov{position:fixed;inset:0;background:rgba(42,32,24,.5);z-index:200;opacity:0;pointer-events:none;transition:opacity .3s;}
+.ov{position:fixed;inset:0;background:rgba(36,28,20,.5);z-index:200;opacity:0;pointer-events:none;transition:opacity .3s;}
 .ov.open{opacity:1;pointer-events:all;}
-.menu{position:fixed;top:0;right:-300px;width:280px;height:100vh;background:var(--ink);z-index:201;transition:right .35s cubic-bezier(.4,0,.2,1);overflow-y:auto;}
+.menu{position:fixed;top:0;right:-300px;width:280px;height:100vh;background:#241C14;z-index:201;
+  transition:right .35s cubic-bezier(.4,0,.2,1);overflow-y:auto;}
 .menu.open{right:0;}
-.mhdr{padding:calc(24px + var(--st2)) 20px 16px;border-bottom:1px solid rgba(255,255,255,.1);}
-.mhdr h2{font-family:'Cormorant Garamond',serif;font-size:1.4rem;color:var(--cr);font-weight:400;font-style:italic;}
-.mhdr p{font-size:.7rem;color:var(--st);margin-top:2px;letter-spacing:.08em;text-transform:uppercase;}
-.mi{display:flex;align-items:center;gap:12px;padding:15px 20px;cursor:pointer;transition:background .2s;border:none;background:none;width:100%;text-align:left;color:rgba(245,239,228,.85);font-family:'Jost',sans-serif;font-size:.93rem;min-height:50px;}
-.mi.act{color:var(--oc);background:rgba(196,154,58,.1);}
-.mic{font-size:1.1rem;width:24px;text-align:center;}
+.mhdr{padding:calc(22px + var(--st2)) 20px 14px;border-bottom:1px solid rgba(255,255,255,.08);}
+.mhdr h2{font-family:'Cormorant Garamond',serif;font-size:1.35rem;color:#F0E8DC;font-weight:400;font-style:italic;}
+.mhdr p{font-size:.68rem;color:#8A7A68;margin-top:2px;letter-spacing:.08em;text-transform:uppercase;}
+.mi{display:flex;align-items:center;gap:12px;padding:14px 20px;cursor:pointer;
+  border:none;background:none;width:100%;text-align:left;
+  color:rgba(240,232,220,.85);font-family:'Jost',sans-serif;font-size:.92rem;min-height:50px;}
+.mi.act{color:#C49A3A;background:rgba(196,154,58,.1);}
+.mic{font-size:1.05rem;width:24px;text-align:center;}
 .main{padding:0 0 calc(60px + var(--sb));}
-.dnav{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 8px;}
-.dnb{background:none;border:1px solid var(--stl);border-radius:50%;width:38px;height:38px;cursor:pointer;color:var(--inkl);font-size:1.1rem;display:flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;}
+
+/* DATE NAV */
+.dnav{display:flex;align-items:center;justify-content:space-between;padding:14px 20px 6px;}
+.dnb{background:none;border:1px solid var(--stl);border-radius:50%;width:38px;height:38px;
+  cursor:pointer;color:var(--inkl);font-size:1.1rem;display:flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;}
 .dnb:disabled{opacity:.3;}
 .ddsp{text-align:center;}
-.dlbl{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;color:var(--ink);}
-.dfl{font-size:.7rem;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:300;}
-.psec{padding:8px 20px 16px;display:flex;align-items:center;gap:16px;}
-.rw{position:relative;width:64px;height:64px;flex-shrink:0;}
+.dlbl{font-family:'Cormorant Garamond',serif;font-size:1.45rem;font-weight:600;color:var(--ink);}
+.dfl{font-size:.68rem;color:var(--mu);letter-spacing:.08em;text-transform:uppercase;font-weight:300;}
+
+/* PROGRESS */
+.psec{padding:6px 20px 14px;display:flex;align-items:center;gap:14px;}
+.rw{position:relative;width:60px;height:60px;flex-shrink:0;}
 .rw svg{transform:rotate(-90deg);}
-.rc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:600;color:var(--tc);}
+.rc{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-family:'Cormorant Garamond',serif;font-size:1rem;font-weight:600;color:#8B4A2A;}
 .pst{flex:1;}
-.pt{font-size:.68rem;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:300;}
-.pn{font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:var(--inkl);}
-.pbs{display:flex;gap:6px;margin-top:6px;}
+.pt{font-size:.65rem;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;font-weight:300;}
+.pn{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--inkl);}
+.pbs{display:flex;gap:6px;margin-top:5px;}
 .pbi{display:flex;flex-direction:column;gap:2px;flex:1;}
-.pbl{font-size:.58rem;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;}
-.pbt{height:4px;background:var(--crd);border-radius:2px;overflow:hidden;}
+.pbl{font-size:.56rem;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;}
+.pbt{height:4px;background:var(--bg2);border-radius:2px;overflow:hidden;}
 .pbf{height:100%;border-radius:2px;transition:width .4s ease;}
-.tblk{margin:0 16px 12px;border-radius:var(--r);overflow:hidden;background:rgba(255,255,255,.65);box-shadow:var(--sha);border:1px solid rgba(196,114,74,.1);}
-.bh{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;position:relative;overflow:hidden;min-height:56px;}
-.bhf{position:absolute;inset:0;background:linear-gradient(90deg,rgba(196,114,74,.12) 0%,transparent 100%);transform-origin:left;transition:transform .5s ease;}
+
+/* TIME BLOCK */
+.tblk{margin:0 14px 10px;border-radius:var(--r);overflow:hidden;
+  background:rgba(255,255,255,.5);box-shadow:var(--sha);border:1px solid rgba(36,28,20,.07);}
+.bh{padding:13px 14px;display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;position:relative;overflow:hidden;min-height:52px;}
+.bhf{position:absolute;inset:0;background:linear-gradient(90deg,rgba(139,74,42,.1) 0%,transparent 100%);
+  transform-origin:left;transition:transform .5s ease;}
 .bhl{display:flex;align-items:center;gap:10px;position:relative;}
-.be{font-size:1.2rem;}
-.btl{font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:600;color:var(--ink);}
-.bti{font-size:.67rem;color:var(--mu);letter-spacing:.06em;font-weight:300;}
-.bhr{display:flex;align-items:center;gap:8px;position:relative;}
-.bp{font-size:.63rem;padding:2px 8px;border-radius:20px;background:var(--crd);color:var(--mu);}
-.bp.dn{background:rgba(90,122,90,.15);color:var(--fo);}
-.bc{font-size:.7rem;color:var(--st);transition:transform .3s;}
+.be{font-size:1.15rem;}
+.btl{font-family:'Cormorant Garamond',serif;font-size:1.05rem;font-weight:600;color:var(--ink);}
+.bti{font-size:.65rem;color:var(--mu);font-weight:300;}
+.bhr{display:flex;align-items:center;gap:7px;position:relative;}
+.bpill{font-size:.6rem;padding:2px 7px;border-radius:20px;background:var(--bg2);color:var(--mu);}
+.bpill.dn{background:rgba(74,107,74,.15);color:#4A6B4A;}
+.bc{font-size:.68rem;color:var(--mu);transition:transform .3s;}
 .bc.op{transform:rotate(180deg);}
-.bts{padding:0 12px 12px;}
-.tc2{margin-bottom:8px;border-radius:var(--rs);border:1px solid rgba(196,114,74,.12);background:rgba(255,255,255,.7);overflow:hidden;}
-.tc2.cmp{background:rgba(90,122,90,.06);border-color:rgba(90,122,90,.2);}
-.tci{padding:10px 12px;display:flex;align-items:center;gap:10px;}
-.tcd{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-.ti{flex:1;min-width:0;}
-.tn{font-size:.88rem;font-weight:500;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.tc2.cmp .tn{color:var(--st);text-decoration:line-through;}
-.tm{display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap;}
-.tinst{font-size:.7rem;color:var(--mu);font-weight:300;}
-.pb2{font-size:.58rem;padding:1px 6px;border-radius:10px;font-weight:400;letter-spacing:.04em;text-transform:uppercase;}
-.pb2.mandatory{background:rgba(196,114,74,.12);color:var(--tc);}
-.pb2.recommended{background:rgba(196,154,58,.12);color:var(--oc);}
-.pb2.optional{background:rgba(154,138,120,.12);color:var(--st);}
-.tdu{font-size:.65rem;color:var(--st);font-weight:300;}
-.ta{display:flex;gap:6px;flex-shrink:0;}
-.tbtn{border:none;border-radius:8px;cursor:pointer;font-family:'Jost',sans-serif;font-size:.8rem;padding:8px 14px;min-height:44px;min-width:44px;}
-.tbtn-d{background:var(--fo);color:white;}
-.tbtn-c{background:var(--crd);color:var(--inkl);}
-.tmin{padding:8px 12px;display:flex;align-items:center;gap:8px;min-height:40px;}
-.tmc2{color:var(--fo);font-size:.8rem;}
-.tmn{font-size:.75rem;color:var(--st);text-decoration:line-through;flex:1;}
-.tmu{font-size:.65rem;color:var(--st);background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;min-height:32px;}
-.sym2{background:linear-gradient(135deg,rgba(196,114,74,.08) 0%,rgba(196,154,58,.06) 100%);border:1px solid rgba(196,114,74,.2);border-radius:var(--rs);padding:14px;margin-bottom:8px;}
-.stl2{font-family:'Cormorant Garamond',serif;font-size:1rem;font-weight:600;color:var(--tc);margin-bottom:12px;}
-.sf{margin-bottom:10px;}
-.sfl{font-size:.7rem;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
-.sbs{display:flex;gap:6px;}
-.sb{flex:1;padding:8px 0;border:1px solid var(--stl);border-radius:8px;background:white;cursor:pointer;font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--inkl);min-height:44px;}
-.sb.sl{background:var(--tc);border-color:var(--tc);color:white;}
-.ni{display:flex;align-items:center;gap:8px;}
-.ni input{width:90px;padding:10px;border:1px solid var(--stl);border-radius:8px;background:white;font-family:'Jost',sans-serif;font-size:.9rem;color:var(--ink);text-align:center;-webkit-appearance:none;min-height:44px;}
-.ni input:focus{outline:none;border-color:var(--tc);}
-.nu{font-size:.73rem;color:var(--mu);}
-.stx{width:100%;padding:8px 10px;border:1px solid var(--stl);border-radius:8px;background:white;font-family:'Jost',sans-serif;font-size:.85rem;color:var(--ink);resize:none;min-height:56px;}
-.stx:focus{outline:none;border-color:var(--tc);}
-.ssv{width:100%;padding:13px;background:var(--tc);color:white;border:none;border-radius:10px;cursor:pointer;font-family:'Jost',sans-serif;font-size:.85rem;font-weight:500;margin-top:8px;min-height:48px;}
-.shov{position:fixed;inset:0;background:rgba(42,32,24,.5);z-index:300;opacity:0;pointer-events:none;transition:opacity .3s;}
+.bts{padding:0 10px 10px;}
+
+/* TASK CARD — new split design */
+.tcard{display:flex;border-radius:var(--r);overflow:hidden;margin-bottom:8px;
+  box-shadow:var(--sha);border:1px solid rgba(36,28,20,.07);
+  transition:all .25s;cursor:pointer;}
+.tcard.done{opacity:.68;box-shadow:0 1px 6px rgba(36,28,20,.05);}
+.tcard-left{width:50px;flex-shrink:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:3px;transition:background .25s;}
+.tcard-left .cat-emoji{font-size:1.15rem;line-height:1;}
+.tcard-left .done-check{font-size:.95rem;color:rgba(255,255,255,.9);}
+.tcard-left .done-lbl{font-size:.48rem;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.05em;}
+.tcard-right{flex:1;padding:9px 12px;min-width:0;transition:background .25s;}
+.tcard-name{font-size:.86rem;font-weight:600;color:var(--ink);line-height:1.3;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tcard.done .tcard-name{text-decoration:line-through;color:var(--mu);}
+.tcard-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:2px;}
+.tcard-instr{font-size:.69rem;color:var(--mu);font-weight:300;line-height:1.3;}
+.tcard-dur{font-size:.63rem;color:#8A7A68;font-weight:300;flex-shrink:0;}
+.tcard-time{font-size:.62rem;color:#7A6B5A;flex-shrink:0;font-weight:400;}
+.tcard-ss{margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;}
+.tcard-ss span{font-size:.6rem;}
+.tcard-actions{display:flex;align-items:center;gap:5px;padding-right:10px;flex-shrink:0;}
+.tbtn{border:none;border-radius:8px;cursor:pointer;font-family:'Jost',sans-serif;
+  font-size:.78rem;padding:7px 11px;min-height:36px;transition:all .2s;}
+.tbtn-d{background:#4A6B4A;color:white;}
+.tbtn-c{background:var(--bg2);color:var(--inkl);}
+
+/* MINIMISED DONE BAR */
+.tmin{padding:7px 12px;display:flex;align-items:center;gap:8px;min-height:38px;}
+.tmin-left{width:50px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.8rem;color:rgba(255,255,255,.9);}
+.tmin-right{flex:1;display:flex;align-items:center;gap:8px;min-width:0;}
+.tmin-name{font-size:.74rem;color:var(--mu);text-decoration:line-through;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tmin-time{font-size:.62rem;color:#8A7A68;flex-shrink:0;}
+.tmin-undo{font-size:.62rem;color:var(--mu);background:none;border:none;cursor:pointer;padding:3px 7px;border-radius:6px;flex-shrink:0;min-height:30px;}
+
+/* SYM LOG */
+.sym2{background:linear-gradient(135deg,rgba(139,74,42,.07) 0%,rgba(122,98,48,.05) 100%);
+  border:1px solid rgba(139,74,42,.18);border-radius:var(--rs);padding:13px;margin-bottom:8px;}
+.stl2{font-family:'Cormorant Garamond',serif;font-size:.98rem;font-weight:600;color:#8B4A2A;margin-bottom:10px;}
+.sf{margin-bottom:9px;}
+.sfl{font-size:.68rem;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
+.sbs{display:flex;gap:5px;}
+.sb{flex:1;padding:7px 0;border:1px solid var(--stl);border-radius:7px;background:white;cursor:pointer;
+  font-family:'Cormorant Garamond',serif;font-size:.95rem;color:var(--inkl);min-height:40px;}
+.sb.sl{background:#8B4A2A;border-color:#8B4A2A;color:white;}
+.ni{display:flex;align-items:center;gap:7px;}
+.ni input{width:80px;padding:8px 10px;border:1px solid var(--stl);border-radius:7px;
+  background:white;font-size:.88rem;color:var(--ink);text-align:center;-webkit-appearance:none;min-height:40px;}
+.ni input:focus{outline:none;border-color:#8B4A2A;}
+.nu{font-size:.7rem;color:var(--mu);}
+.stx{width:100%;padding:7px 10px;border:1px solid var(--stl);border-radius:7px;
+  background:white;font-size:.83rem;color:var(--ink);resize:none;min-height:52px;}
+.stx:focus{outline:none;border-color:#8B4A2A;}
+.ssv{width:100%;padding:11px;background:#8B4A2A;color:white;border:none;border-radius:9px;
+  cursor:pointer;font-family:'Jost',sans-serif;font-size:.83rem;font-weight:500;margin-top:7px;min-height:44px;}
+
+/* BOTTOM SHEET */
+.shov{position:fixed;inset:0;background:rgba(36,28,20,.5);z-index:300;opacity:0;pointer-events:none;transition:opacity .3s;}
 .shov.open{opacity:1;pointer-events:all;}
-.sh{position:fixed;bottom:-100%;left:0;right:0;max-width:480px;margin:0 auto;background:var(--cr);border-radius:24px 24px 0 0;z-index:301;padding:0 0 calc(24px + var(--sb));max-height:90dvh;overflow-y:auto;transition:bottom .4s cubic-bezier(.4,0,.2,1);}
+.sh{position:fixed;bottom:-100%;left:0;right:0;max-width:480px;margin:0 auto;
+  background:var(--bg);border-radius:22px 22px 0 0;z-index:301;
+  padding:0 0 calc(20px + var(--sb));max-height:90dvh;overflow-y:auto;
+  transition:bottom .4s cubic-bezier(.4,0,.2,1);}
 .sh.open{bottom:0;}
-.shh{width:40px;height:4px;background:var(--stl);border-radius:2px;margin:12px auto 0;}
-.shhdr{padding:16px 20px 12px;border-bottom:1px solid var(--crd);}
-.shtl{font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-weight:600;color:var(--ink);}
-.shsb{font-size:.7rem;color:var(--mu);margin-top:2px;}
-.shbd{padding:16px 20px;}
-.shlb{font-size:.68rem;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
-.cta{width:100%;padding:10px 12px;border:1px solid var(--stl);border-radius:10px;background:white;font-family:'Jost',sans-serif;font-size:.88rem;color:var(--ink);resize:none;min-height:80px;margin-bottom:16px;}
-.cta:focus{outline:none;border-color:var(--tc);}
-.vl{display:flex;align-items:center;gap:8px;padding:12px;background:rgba(196,114,74,.08);border-radius:8px;margin-bottom:6px;text-decoration:none;color:var(--tc);font-size:.82rem;min-height:48px;}
-.vls{margin-bottom:16px;}
-.subb{display:flex;align-items:center;gap:8px;padding:12px;background:rgba(196,154,58,.08);border:1px solid rgba(196,154,58,.2);border-radius:10px;margin-bottom:6px;cursor:pointer;width:100%;text-align:left;min-height:52px;}
-.subn{font-size:.85rem;color:var(--inkl);font-weight:500;}
-.subd{font-size:.7rem;color:var(--mu);}
-.shsv{width:100%;padding:13px;background:var(--tc);color:white;border:none;border-radius:12px;cursor:pointer;font-family:'Jost',sans-serif;font-size:.9rem;font-weight:500;margin-bottom:8px;min-height:48px;}
-.shdn{width:100%;padding:13px;background:var(--fo);color:white;border:none;border-radius:12px;cursor:pointer;font-family:'Jost',sans-serif;font-size:.9rem;font-weight:500;min-height:48px;}
-.tmd{text-align:center;padding:16px 0;}
-.tmt{font-family:'Cormorant Garamond',serif;font-size:3rem;font-weight:400;color:var(--tc);}
-.tmc3{display:flex;gap:10px;justify-content:center;margin-top:12px;}
-.tmb{padding:10px 20px;border-radius:10px;border:none;cursor:pointer;font-family:'Jost',sans-serif;font-size:.85rem;min-height:44px;}
-.tmb-s{background:var(--fo);color:white;}
-.tmb-p{background:var(--oc);color:white;}
-.tmb-r{background:var(--crd);color:var(--inkl);}
-.ref{padding:16px;}
-.ph{padding:20px 16px 8px;}
-.ptl{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:600;color:var(--ink);line-height:1.1;}
-.ps{font-size:.73rem;color:var(--mu);margin-top:4px;font-weight:300;letter-spacing:.04em;}
-.sdv{padding:8px 16px 4px;font-size:.67rem;color:var(--tc);text-transform:uppercase;letter-spacing:.1em;font-weight:500;}
-.rc3{background:rgba(255,255,255,.65);border:1px solid rgba(196,114,74,.12);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:var(--sha);}
-.rct{font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:600;color:var(--ink);margin-bottom:8px;}
-.rcs{font-size:.68rem;color:var(--tc);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;}
+.shh{width:38px;height:4px;background:var(--stl);border-radius:2px;margin:11px auto 0;}
+.shhdr{padding:14px 18px 10px;border-bottom:1px solid var(--bg2);}
+.shtl{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:600;color:var(--ink);}
+.shsb{font-size:.68rem;color:var(--mu);margin-top:2px;}
+.shbd{padding:14px 18px;}
+.shlb{font-size:.66rem;color:var(--mu);text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;margin-top:12px;}
+.cta{width:100%;padding:9px 11px;border:1px solid var(--stl);border-radius:9px;
+  background:white;font-size:.85rem;color:var(--ink);resize:none;min-height:70px;margin-bottom:4px;}
+.cta:focus{outline:none;border-color:#8B4A2A;}
+.tinput{width:100%;padding:9px 11px;border:1px solid var(--stl);border-radius:9px;
+  background:white;font-size:.88rem;color:var(--ink);}
+.tinput:focus{outline:none;border-color:#8B4A2A;}
+.vl{display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(139,74,42,.07);
+  border-radius:8px;margin-bottom:5px;text-decoration:none;color:#8B4A2A;font-size:.8rem;min-height:44px;}
+.vls{margin-bottom:4px;}
+.subb{display:flex;align-items:center;gap:8px;padding:10px 12px;background:rgba(122,98,48,.07);
+  border:1px solid rgba(122,98,48,.2);border-radius:9px;margin-bottom:5px;cursor:pointer;
+  width:100%;text-align:left;min-height:48px;}
+.subn{font-size:.83rem;color:var(--inkl);font-weight:500;}
+.subd{font-size:.68rem;color:var(--mu);}
+.shsv{width:100%;padding:12px;background:#8B4A2A;color:white;border:none;border-radius:11px;
+  cursor:pointer;font-family:'Jost',sans-serif;font-size:.88rem;font-weight:500;margin-bottom:7px;min-height:46px;}
+.shdn{width:100%;padding:12px;background:#4A6B4A;color:white;border:none;border-radius:11px;
+  cursor:pointer;font-family:'Jost',sans-serif;font-size:.88rem;font-weight:500;min-height:46px;}
+
+/* TIMER */
+.tmd{text-align:center;padding:12px 0;}
+.tmt{font-family:'Cormorant Garamond',serif;font-size:2.8rem;font-weight:400;color:#8B4A2A;}
+.tmc3{display:flex;gap:8px;justify-content:center;margin-top:10px;}
+.tmb{padding:9px 18px;border-radius:9px;border:none;cursor:pointer;
+  font-family:'Jost',sans-serif;font-size:.83rem;min-height:42px;}
+.tmb-s{background:#4A6B4A;color:white;}
+.tmb-p{background:#7A6230;color:white;}
+.tmb-r{background:var(--bg2);color:var(--inkl);}
+
+/* REF TABS */
+.ref{padding:14px;}
+.ph{padding:18px 14px 6px;}
+.ptl{font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:600;color:var(--ink);line-height:1.1;}
+.ps{font-size:.7rem;color:var(--mu);margin-top:3px;font-weight:300;letter-spacing:.04em;}
+.sdv{padding:7px 14px 3px;font-size:.64rem;color:#8B4A2A;text-transform:uppercase;letter-spacing:.1em;font-weight:500;}
+.rc3{background:rgba(255,255,255,.55);border:1px solid rgba(36,28,20,.08);border-radius:var(--r);
+  padding:14px;margin-bottom:10px;box-shadow:var(--sha);}
+.rct{font-family:'Cormorant Garamond',serif;font-size:1.05rem;font-weight:600;color:var(--ink);margin-bottom:7px;}
+.rcs{font-size:.66rem;color:#8B4A2A;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
 .rl{list-style:none;}
-.rl li{padding:5px 0;font-size:.84rem;color:var(--inkl);border-bottom:1px solid rgba(196,114,74,.08);display:flex;align-items:flex-start;gap:8px;line-height:1.4;}
-.rl li::before{content:'•';color:var(--tc);flex-shrink:0;margin-top:1px;}
-.rl.av li::before{color:#8B6B4A;content:'✗';}
-.hc{background:linear-gradient(135deg,rgba(196,154,58,.06) 0%,rgba(90,122,90,.06) 100%);border:1px solid rgba(196,154,58,.2);border-radius:var(--rs);padding:14px;margin-bottom:10px;}
-.hn{font-family:'Cormorant Garamond',serif;font-size:1.05rem;font-weight:600;color:var(--oc);}
-.hm{font-size:.7rem;color:var(--mu);margin:3px 0 6px;}
-.hp{font-size:.82rem;color:var(--inkl);line-height:1.5;}
-.hs2{display:inline-block;font-size:.6rem;padding:2px 8px;border-radius:10px;background:rgba(90,122,90,.12);color:var(--fo);text-transform:uppercase;letter-spacing:.06em;margin-top:6px;}
-.sc2{background:rgba(255,255,255,.65);border:1px solid rgba(196,114,74,.12);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;box-shadow:var(--sha);}
-.sch{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
-.sn{font-family:'Cormorant Garamond',serif;font-size:1.05rem;font-weight:600;color:var(--ink);}
-.stog{width:44px;height:24px;border-radius:12px;border:none;cursor:pointer;position:relative;transition:background .3s;flex-shrink:0;min-height:44px;min-width:44px;}
-.stog.on{background:var(--fo);}
+.rl li{padding:4px 0;font-size:.82rem;color:var(--inkl);border-bottom:1px solid rgba(36,28,20,.06);
+  display:flex;align-items:flex-start;gap:7px;line-height:1.4;}
+.rl li::before{content:'•';color:#8B4A2A;flex-shrink:0;margin-top:1px;}
+.rl.av li::before{color:#6A5A48;content:'✗';}
+
+/* LIBRARY TASK CARD in ref tabs */
+.lib-card{background:rgba(255,255,255,.55);border:1px solid rgba(36,28,20,.08);
+  border-radius:var(--r);margin-bottom:8px;box-shadow:var(--sha);overflow:hidden;}
+.lib-card-body{display:flex;}
+.lib-card-left{width:44px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.1rem;}
+.lib-card-content{flex:1;padding:9px 10px;min-width:0;}
+.lib-card-name{font-size:.85rem;font-weight:600;color:var(--ink);margin-bottom:2px;}
+.lib-card-instr{font-size:.68rem;color:var(--mu);font-weight:300;}
+.lib-card-meta{display:flex;align-items:center;gap:6px;margin-top:3px;flex-wrap:wrap;}
+.lib-card-actions{display:flex;flex-direction:column;justify-content:center;gap:5px;padding:8px 10px 8px 0;flex-shrink:0;}
+.lib-btn{border:none;border-radius:7px;cursor:pointer;font-family:'Jost',sans-serif;
+  font-size:.72rem;padding:5px 9px;min-height:32px;white-space:nowrap;}
+.lib-btn-add{background:#4A6B4A;color:white;}
+.lib-btn-edit{background:var(--bg2);color:var(--inkl);}
+.lib-card-ss{margin-top:4px;display:flex;gap:8px;flex-wrap:wrap;}
+.lib-card-ss span{font-size:.58rem;}
+
+/* SUPPLEMENTS TAB */
+.sc2{background:rgba(255,255,255,.55);border:1px solid rgba(36,28,20,.08);border-radius:var(--r);
+  padding:12px 14px;margin-bottom:9px;box-shadow:var(--sha);}
+.sch{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px;}
+.sn{font-family:'Cormorant Garamond',serif;font-size:1.02rem;font-weight:600;color:var(--ink);}
+.stog{width:42px;height:22px;border-radius:11px;border:none;cursor:pointer;
+  position:relative;transition:background .3s;flex-shrink:0;min-height:44px;min-width:44px;}
+.stog.on{background:#4A6B4A;}
 .stog.off{background:var(--stl);}
-.stog::after{content:'';position:absolute;width:18px;height:18px;border-radius:50%;background:white;top:3px;transition:left .3s;}
+.stog::after{content:'';position:absolute;width:16px;height:16px;border-radius:50%;
+  background:white;top:3px;transition:left .3s;}
 .stog.on::after{left:23px;}
 .stog.off::after{left:3px;}
-.sm2{font-size:.7rem;color:var(--mu);margin-bottom:6px;}
-.sp2{font-size:.82rem;color:var(--inkl);line-height:1.5;}
-.asb{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;background:rgba(196,114,74,.08);border:1px dashed rgba(196,114,74,.3);border-radius:var(--r);cursor:pointer;color:var(--tc);font-family:'Jost',sans-serif;font-size:.85rem;margin-bottom:12px;min-height:52px;}
-.wg{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:16px;}
+.sm2{font-size:.68rem;color:var(--mu);margin-bottom:5px;}
+.sp2{font-size:.8rem;color:var(--inkl);line-height:1.5;}
+.supp-actions{display:flex;gap:6px;margin-top:8px;}
+.supp-btn{border:none;border-radius:7px;cursor:pointer;font-family:'Jost',sans-serif;
+  font-size:.72rem;padding:6px 11px;min-height:34px;}
+.supp-btn-edit{background:var(--bg2);color:var(--inkl);}
+.supp-btn-arch{background:rgba(106,90,72,.1);color:#6A5A48;}
+.supp-btn-del{background:rgba(180,60,60,.08);color:#B03030;}
+.asb{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;padding:12px;
+  background:rgba(139,74,42,.07);border:1px dashed rgba(139,74,42,.28);border-radius:var(--r);
+  cursor:pointer;color:#8B4A2A;font-family:'Jost',sans-serif;font-size:.83rem;margin-bottom:10px;min-height:48px;}
+.hc{background:linear-gradient(135deg,rgba(122,98,48,.06) 0%,rgba(74,107,74,.06) 100%);
+  border:1px solid rgba(122,98,48,.2);border-radius:var(--rs);padding:12px;margin-bottom:9px;}
+.hn{font-family:'Cormorant Garamond',serif;font-size:1.02rem;font-weight:600;color:#7A6230;}
+.hm{font-size:.68rem;color:var(--mu);margin:2px 0 5px;}
+.hp{font-size:.8rem;color:var(--inkl);line-height:1.5;}
+.hs2{display:inline-block;font-size:.58rem;padding:2px 7px;border-radius:9px;
+  background:rgba(74,107,74,.12);color:#4A6B4A;text-transform:uppercase;letter-spacing:.06em;margin-top:5px;}
+
+/* EDIT FORM */
+.edit-form{background:rgba(255,255,255,.7);border:1px solid rgba(139,74,42,.12);
+  border-radius:var(--r);padding:14px;margin-bottom:10px;}
+.ef-title{font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:600;color:var(--ink);margin-bottom:12px;}
+.ff{margin-bottom:9px;}
+.fl{font-size:.66rem;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;display:block;}
+.fi{width:100%;padding:8px 11px;border:1px solid var(--stl);border-radius:8px;
+  background:white;font-family:'Jost',sans-serif;font-size:.85rem;color:var(--ink);min-height:40px;}
+.fi:focus{outline:none;border-color:#8B4A2A;}
+.fsel{width:100%;padding:8px 11px;border:1px solid var(--stl);border-radius:8px;
+  background:white;font-family:'Jost',sans-serif;font-size:.85rem;color:var(--ink);min-height:40px;appearance:none;}
+.fr2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.fact{display:flex;gap:7px;margin-top:10px;}
+.fsv{flex:1;padding:10px;background:#8B4A2A;color:white;border:none;border-radius:9px;
+  cursor:pointer;font-family:'Jost',sans-serif;font-size:.83rem;min-height:44px;}
+.fcl{padding:10px 14px;background:var(--bg2);color:var(--inkl);border:none;border-radius:9px;
+  cursor:pointer;font-family:'Jost',sans-serif;font-size:.83rem;min-height:44px;}
+
+/* PRIORITY BADGE */
+.pb2{font-size:.56rem;padding:1px 5px;border-radius:9px;font-weight:400;letter-spacing:.04em;text-transform:uppercase;}
+.pb2.mandatory{background:rgba(139,74,42,.12);color:#8B4A2A;}
+.pb2.recommended{background:rgba(122,98,48,.12);color:#7A6230;}
+.pb2.optional{background:rgba(106,90,72,.12);color:#6A5A48;}
+
+/* WEEKLY */
+.wg{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:14px;}
 .wdc{text-align:center;}
-.wdl{font-size:.6rem;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
-.wdb{height:48px;border-radius:6px;background:var(--crd);position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;}
-.wbf{border-radius:6px;width:100%;transition:height .5s ease;}
-.wdp{font-size:.6rem;color:var(--mu);margin-top:3px;}
-.sch3{background:rgba(255,255,255,.65);border-radius:var(--r);padding:16px;margin-bottom:12px;box-shadow:var(--sha);}
-.ctl{font-family:'Cormorant Garamond',serif;font-size:1rem;font-weight:600;color:var(--ink);margin-bottom:12px;}
-.cls{position:relative;height:80px;}
+.wdl{font-size:.58rem;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;}
+.wdb{height:44px;border-radius:5px;background:var(--bg2);overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;}
+.wbf{border-radius:5px;width:100%;transition:height .5s ease;}
+.wdp{font-size:.58rem;color:var(--mu);margin-top:2px;}
+.sch3{background:rgba(255,255,255,.55);border-radius:var(--r);padding:14px;margin-bottom:10px;box-shadow:var(--sha);}
+.ctl{font-family:'Cormorant Garamond',serif;font-size:.98rem;font-weight:600;color:var(--ink);margin-bottom:10px;}
+.cls{position:relative;height:72px;}
 .csvg{width:100%;height:100%;overflow:visible;}
-.setb{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;background:rgba(255,255,255,.65);border:1px solid rgba(196,114,74,.12);border-radius:var(--rs);cursor:pointer;margin-bottom:10px;font-family:'Jost',sans-serif;font-size:.9rem;color:var(--inkl);text-align:left;box-shadow:var(--sha);min-height:56px;}
-.si{font-size:1.2rem;}
-.db{margin:0 16px 12px;background:linear-gradient(135deg,rgba(196,114,74,.12) 0%,rgba(196,154,58,.08) 100%);border:1px solid rgba(196,114,74,.2);border-radius:var(--r);padding:16px;}
-.dp{font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:600;color:var(--tc);}
-.ds2{font-size:.73rem;color:var(--mu);margin-top:2px;font-weight:300;letter-spacing:.04em;}
-.dd{font-size:.82rem;color:var(--inkl);margin-top:8px;line-height:1.5;}
-.ff{margin-bottom:10px;}
-.fl{font-size:.68rem;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;display:block;}
-.fi{width:100%;padding:10px 12px;border:1px solid var(--stl);border-radius:8px;background:white;font-family:'Jost',sans-serif;font-size:.88rem;color:var(--ink);min-height:44px;}
-.fi:focus{outline:none;border-color:var(--tc);}
-.fr{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-.fact{display:flex;gap:8px;margin-top:12px;}
-.fsv{flex:1;padding:12px;background:var(--tc);color:white;border:none;border-radius:10px;cursor:pointer;font-family:'Jost',sans-serif;font-size:.85rem;min-height:48px;}
-.fcl{padding:12px 16px;background:var(--crd);color:var(--inkl);border:none;border-radius:10px;cursor:pointer;font-family:'Jost',sans-serif;font-size:.85rem;min-height:48px;}
-.adf{background:rgba(255,255,255,.65);border:1px solid rgba(196,114,74,.15);border-radius:var(--r);padding:16px;margin-bottom:12px;}
-.fade{animation:fi .3s ease forwards;}
-@keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* SETTINGS */
+.setb{display:flex;align-items:center;gap:11px;width:100%;padding:13px 14px;
+  background:rgba(255,255,255,.55);border:1px solid rgba(36,28,20,.08);border-radius:var(--rs);
+  cursor:pointer;margin-bottom:9px;font-family:'Jost',sans-serif;font-size:.88rem;color:var(--inkl);
+  text-align:left;box-shadow:var(--sha);min-height:52px;}
+.si{font-size:1.15rem;}
+
+/* AYURVEDA */
+.db{margin:0 0 12px;background:linear-gradient(135deg,rgba(139,74,42,.1) 0%,rgba(122,98,48,.07) 100%);
+  border:1px solid rgba(139,74,42,.18);border-radius:var(--r);padding:14px;}
+.dp{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:600;color:#8B4A2A;}
+.ds2{font-size:.7rem;color:var(--mu);margin-top:2px;font-weight:300;letter-spacing:.04em;}
+.dd{font-size:.8rem;color:var(--inkl);margin-top:7px;line-height:1.5;}
+
+.fade{animation:fadeIn .3s ease forwards;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.tag{font-size:.58rem;padding:1px 6px;border-radius:8px;background:var(--bg2);color:var(--mu);}
 `;
 
+// ─── TIMER HOOK ─────────────────────────────────────────────────────────────
 function useTimer(secs){
   const[s,setS]=useState(secs);const[run,setRun]=useState(false);const r=useRef(null);
   useEffect(()=>{
@@ -308,254 +511,769 @@ function useTimer(secs){
   return{display:fmt(s),running:run,done:s===0,start:()=>setRun(true),pause:()=>setRun(false),reset:()=>{setRun(false);setS(secs);}};
 }
 
-function SymLog({title,fields,data,onChange,onSave}){
-  return <div className="sym2 fade">
-    <div className="stl2">📊 {title}</div>
-    {fields.map(f=><div key={f.key} className="sf">
-      <div className="sfl">{f.label}</div>
-      {f.type==="scale"&&<div className="sbs">{[1,2,3,4,5].map(n=><button key={n} className={`sb${data[f.key]===n?" sl":""}`} onClick={()=>onChange(f.key,n)}>{n}</button>)}</div>}
-      {f.type==="number"&&<div className="ni"><input type="number" inputMode="numeric" value={data[f.key]||""} onChange={e=>onChange(f.key,e.target.value)} placeholder="—"/>{f.unit&&<span className="nu">{f.unit}</span>}</div>}
-      {f.type==="text"&&<textarea className="stx" value={data[f.key]||""} onChange={e=>onChange(f.key,e.target.value)} placeholder="Add notes..." rows={2}/>}
-    </div>)}
-    <button className="ssv" onClick={onSave}>Save Log Entry</button>
-  </div>;
-}
-
-function Sheet({task,open,onClose,onComplete,comment,onCC,onSave}){
-  const dur=pd(task?.duration||"");
-  const timer=useTimer(dur||60);
-  if(!task)return null;
-  const cat=CATS[task.category];
-  return <>
-    <div className={`shov${open?" open":""}`} onClick={onClose}/>
-    <div className={`sh${open?" open":""}`}>
-      <div className="shh"/>
-      <div className="shhdr"><div className="shtl">{cat?.icon} {task.name}</div><div className="shsb">{task.instruction} · {task.duration}</div></div>
-      <div className="shbd">
-        {dur>0&&<><div className="shlb">Timer</div><div className="tmd"><div className="tmt">{timer.display}</div><div className="tmc3">{!timer.running?<button className="tmb tmb-s" onClick={timer.start}>{timer.done?"Done!":"Start"}</button>:<button className="tmb tmb-p" onClick={timer.pause}>Pause</button>}<button className="tmb tmb-r" onClick={timer.reset}>Reset</button></div></div></>}
-        {task.substitutions?.length>0&&<><div className="shlb" style={{marginTop:8}}>Swap With</div>{task.substitutions.map(sid=>{const sub=TASKS.find(t=>t.id===sid);if(!sub)return null;return <button key={sid} className="subb" onClick={()=>{onComplete(sub.id);onClose();}}><span>🔄</span><div><div className="subn">{sub.name}</div><div className="subd">{sub.instruction} · {sub.duration}</div></div></button>;})}</>}
-        {task.videos?.length>0&&<><div className="shlb" style={{marginTop:8}}>Video Guides</div><div className="vls">{task.videos.map((u,i)=><a key={i} href={u} target="_blank" rel="noopener noreferrer" className="vl">▶ Video Guide {task.videos.length>1?i+1:""}</a>)}</div></>}
-        <div className="shlb">Comment</div>
-        <textarea className="cta" value={comment} onChange={e=>onCC(e.target.value)} placeholder="Add a note about this session..."/>
-        <button className="shsv" onClick={()=>{onSave();onClose();}}>Save Comment</button>
-        <button className="shdn" onClick={()=>{onComplete(task.id);onClose();}}>✓ Mark Complete</button>
+// ─── EDIT FORM ──────────────────────────────────────────────────────────────
+function EditForm({task,onSave,onCancel,isSupp=false}){
+  const[f,setF]=useState({
+    name:task.name||"",
+    instruction:task.instruction||"",
+    duration:task.duration||"—",
+    block:task.block||"morning",
+    priority:task.priority||"recommended",
+    category:task.category||"movement",
+    scent:task.scent||"",
+    sound:task.sound||"",
+    notes:task.notes||task.purpose||"",
+    dose:task.dose||"",
+    timing:task.timing||"",
+    active:task.active!==false,
+  });
+  const set=(k,v)=>setF(x=>({...x,[k]:v}));
+  return(
+    <div className="edit-form fade">
+      <div className="ef-title">{task.id?"Edit":"New"} {isSupp?"Supplement":"Activity"}</div>
+      <div className="ff"><label className="fl">Name</label><input className="fi" value={f.name} onChange={e=>set("name",e.target.value)}/></div>
+      {isSupp&&<><div className="fr2"><div className="ff"><label className="fl">Dose</label><input className="fi" value={f.dose} onChange={e=>set("dose",e.target.value)} placeholder="e.g. 2 caps"/></div><div className="ff"><label className="fl">Timing text</label><input className="fi" value={f.timing} onChange={e=>set("timing",e.target.value)} placeholder="e.g. With dinner"/></div></div></>}
+      {!isSupp&&<div className="ff"><label className="fl">Instruction (max 50 chars)</label><input className="fi" value={f.instruction} maxLength={55} onChange={e=>set("instruction",e.target.value)}/></div>}
+      <div className="fr2">
+        <div className="ff"><label className="fl">Duration</label><input className="fi" value={f.duration} onChange={e=>set("duration",e.target.value)} placeholder="e.g. 10 min"/></div>
+        <div className="ff"><label className="fl">Time Block</label>
+          <select className="fsel" value={f.block} onChange={e=>set("block",e.target.value)}>
+            {BLOCK_IDS.map(b=><option key={b} value={b}>{b}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="fr2">
+        <div className="ff"><label className="fl">Priority</label>
+          <select className="fsel" value={f.priority} onChange={e=>set("priority",e.target.value)}>
+            <option value="mandatory">Mandatory</option>
+            <option value="recommended">Recommended</option>
+            <option value="optional">Optional</option>
+          </select>
+        </div>
+        <div className="ff"><label className="fl">Category</label>
+          <select className="fsel" value={f.category} onChange={e=>set("category",e.target.value)}>
+            {Object.entries(CAT_COLORS).map(([k,c])=><option key={k} value={k}>{c.icon} {c.label}</option>)}
+          </select>
+        </div>
+      </div>
+      <div className="ff"><label className="fl">🌸 Scent (optional)</label><input className="fi" value={f.scent} onChange={e=>set("scent",e.target.value)} placeholder="e.g. Frankincense"/></div>
+      <div className="ff"><label className="fl">🎵 Sound (optional)</label><input className="fi" value={f.sound} onChange={e=>set("sound",e.target.value)} placeholder="e.g. Raga Bhairav"/></div>
+      <div className="ff"><label className="fl">Notes / Purpose</label><textarea className="stx" value={f.notes} rows={2} onChange={e=>set("notes",e.target.value)}/></div>
+      <div className="fact">
+        <button className="fcl" onClick={onCancel}>Cancel</button>
+        <button className="fsv" onClick={()=>onSave(f)}>Save</button>
       </div>
     </div>
-  </>;
+  );
 }
 
-function Block({block,tasks,dayData,onComplete,onUndo,onSheet,onSymChange,onSymSave}){
-  const[open,setOpen]=useState(block.id==="morning"||block.id==="midday");
-  const bt=tasks.filter(t=>t.block===block.id&&!t.hidden);
-  const mand=bt.filter(t=>t.priority==="mandatory"&&t.category!=="tracking");
+// ─── TASK CARD (split design) ────────────────────────────────────────────────
+function TaskCard({task,done,time,onComplete,onUndo,onSheet}){
+  const cat=CAT_COLORS[task.category]||CAT_COLORS.movement;
+  const pri=PRI_COLORS[task.priority]||PRI_COLORS.recommended;
+  if(done){
+    return(
+      <div className="tcard done" style={{borderColor:"rgba(74,107,74,.2)"}}>
+        <div className="tcard-left" style={{background:DONE_PANEL}}>
+          <span className="done-check">✓</span>
+        </div>
+        <div className="tcard-right" style={{background:DONE_BG}}>
+          <div className="tmin" style={{padding:0}}>
+            <div className="tmin-right">
+              <span className="tmin-name">{task.name}</span>
+              {time&&<span className="tmin-time">at {time}</span>}
+            </div>
+            <button className="tmin-undo" onClick={e=>{e.stopPropagation();onUndo();}}>undo</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return(
+    <div className="tcard">
+      <div className="tcard-left" style={{background:pri.panel}}>
+        <span className="cat-emoji">{cat.icon}</span>
+      </div>
+      <div className="tcard-right" style={{background:cat.bg}}>
+        <div className="tcard-row">
+          <div className="tcard-name">{task.name}</div>
+          {task.duration!=="—"&&task.duration&&<span className="tcard-dur">{task.duration}</span>}
+        </div>
+        <div className="tcard-instr">{task.instruction}</div>
+        {(task.scent||task.sound)&&(
+          <div className="tcard-ss">
+            {task.scent&&<span style={{color:"#7A6230"}}>🌸 {task.scent}</span>}
+            {task.sound&&<span style={{color:"#4A6B4A"}}>🎵 {task.sound}</span>}
+          </div>
+        )}
+      </div>
+      <div className="tcard-actions">
+        <button className="tbtn tbtn-c" onClick={e=>{e.stopPropagation();onSheet();}}>✎</button>
+        <button className="tbtn tbtn-d" onClick={e=>{e.stopPropagation();onComplete();}}>✓</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── SYM LOG ────────────────────────────────────────────────────────────────
+function SymLog({title,fields,data,onChange,onSave}){
+  return(
+    <div className="sym2 fade">
+      <div className="stl2">📊 {title}</div>
+      {fields.map(f=>(
+        <div key={f.key} className="sf">
+          <div className="sfl">{f.label}</div>
+          {f.type==="scale"&&<div className="sbs">{[1,2,3,4,5].map(n=><button key={n} className={`sb${data[f.key]===n?" sl":""}`} onClick={()=>onChange(f.key,n)}>{n}</button>)}</div>}
+          {f.type==="number"&&<div className="ni"><input type="number" inputMode="numeric" value={data[f.key]||""} onChange={e=>onChange(f.key,e.target.value)} placeholder="—"/>{f.unit&&<span className="nu">{f.unit}</span>}</div>}
+          {f.type==="text"&&<textarea className="stx" value={data[f.key]||""} onChange={e=>onChange(f.key,e.target.value)} placeholder="Add notes..." rows={2}/>}
+        </div>
+      ))}
+      <button className="ssv" onClick={onSave}>Save Log Entry</button>
+    </div>
+  );
+}
+
+// ─── BOTTOM SHEET ────────────────────────────────────────────────────────────
+function Sheet({task,open,onClose,onComplete,comment,onCC,onSave,time,onTimeChange,allTasks}){
+  const dur=parseDur(task?.duration||"");
+  const timer=useTimer(dur||60);
+  if(!task)return null;
+  const showTimer=dur>0&&!task.noTimer;
+  const subs=(task.substitutions||[]).map(sid=>allTasks.find(t=>t.id===sid)).filter(Boolean);
+  return(
+    <>
+      <div className={`shov${open?" open":""}`} onClick={onClose}/>
+      <div className={`sh${open?" open":""}`}>
+        <div className="shh"/>
+        <div className="shhdr">
+          <div className="shtl">{CAT_COLORS[task.category]?.icon} {task.name}</div>
+          <div className="shsb">{task.instruction}{task.duration&&task.duration!=="—"?" · "+task.duration:""}</div>
+        </div>
+        <div className="shbd">
+          {showTimer&&(
+            <>
+              <div className="shlb">Timer</div>
+              <div className="tmd">
+                <div className="tmt">{timer.display}</div>
+                <div className="tmc3">
+                  {!timer.running?<button className="tmb tmb-s" onClick={timer.start}>{timer.done?"Done!":"Start"}</button>:<button className="tmb tmb-p" onClick={timer.pause}>Pause</button>}
+                  <button className="tmb tmb-r" onClick={timer.reset}>Reset</button>
+                </div>
+              </div>
+            </>
+          )}
+          {subs.length>0&&(
+            <>
+              <div className="shlb">Swap With</div>
+              {subs.map(sub=>(
+                <button key={sub.id} className="subb" onClick={()=>{onComplete(sub.id);onClose();}}>
+                  <span>🔄</span>
+                  <div><div className="subn">{sub.name}</div><div className="subd">{sub.instruction} · {sub.duration}</div></div>
+                </button>
+              ))}
+            </>
+          )}
+          {task.videos?.length>0&&(
+            <>
+              <div className="shlb">Video Guides</div>
+              <div className="vls">{task.videos.map((u,i)=><a key={i} href={u} target="_blank" rel="noopener noreferrer" className="vl">▶ Video Guide {task.videos.length>1?i+1:""}</a>)}</div>
+            </>
+          )}
+          <div className="shlb">Time Completed</div>
+          <input className="tinput" type="time" value={time||""} onChange={e=>onTimeChange(e.target.value)} style={{marginBottom:4}}/>
+          <div className="shlb">Comment</div>
+          <textarea className="cta" value={comment} onChange={e=>onCC(e.target.value)} placeholder="Add a note about this session..."/>
+          <button className="shsv" onClick={()=>{onSave();onClose();}}>Save Comment</button>
+          <button className="shdn" onClick={()=>{onComplete(task.id);onClose();}}>✓ Mark Complete</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── LIBRARY CARD (in reference tabs) ────────────────────────────────────────
+function LibCard({task,onAddToday,onEdit,showAdd=true}){
+  const cat=CAT_COLORS[task.category]||CAT_COLORS.movement;
+  const pri=PRI_COLORS[task.priority]||PRI_COLORS.recommended;
+  return(
+    <div className="lib-card">
+      <div className="lib-card-body">
+        <div className="lib-card-left" style={{background:cat.bg,minHeight:52}}>
+          <span>{cat.icon}</span>
+        </div>
+        <div className="lib-card-content">
+          <div className="lib-card-name" style={{color:pri.panel}}>{task.name}</div>
+          <div className="lib-card-instr">{task.instruction}{task.duration&&task.duration!=="—"?" · "+task.duration:""}</div>
+          <div className="lib-card-meta">
+            <span className={`pb2 ${task.priority}`}>{PRI_COLORS[task.priority]?.label||task.priority}</span>
+            {task.scent&&<span style={{fontSize:".58rem",color:"#7A6230"}}>🌸</span>}
+            {task.sound&&<span style={{fontSize:".58rem",color:"#4A6B4A"}}>🎵</span>}
+          </div>
+          {(task.scent||task.sound)&&(
+            <div className="lib-card-ss">
+              {task.scent&&<span style={{color:"#7A6230"}}>🌸 {task.scent}</span>}
+              {task.sound&&<span style={{color:"#4A6B4A"}}>🎵 {task.sound}</span>}
+            </div>
+          )}
+          {task.videos?.length>0&&(
+            <div style={{marginTop:5}}>
+              {task.videos.map((u,i)=><a key={i} href={u} target="_blank" rel="noopener noreferrer" className="vl" style={{marginBottom:3,padding:"6px 10px"}}>▶ Video {task.videos.length>1?i+1:""}</a>)}
+            </div>
+          )}
+        </div>
+        <div className="lib-card-actions">
+          {showAdd&&<button className="lib-btn lib-btn-add" onClick={onAddToday}>+ Today</button>}
+          <button className="lib-btn lib-btn-edit" onClick={onEdit}>✎ Edit</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TIME BLOCK ──────────────────────────────────────────────────────────────
+function TimeBlock({block,tasks,dayData,blockOpen,onToggle,onComplete,onUndo,onSheet,onSymChange,onSymSave}){
+  const blockTasks=tasks.filter(t=>t.block===block.id&&!t.hidden&&!t.archived);
+  const mand=blockTasks.filter(t=>t.priority==="mandatory"&&t.category!=="tracking");
   const comp=mand.filter(t=>dayData.completed?.[t.id]);
   const pct=mand.length>0?Math.round((comp.length/mand.length)*100):0;
-  const all=pct===100&&mand.length>0;
-  return <div className="tblk">
-    <div className="bh" onClick={()=>setOpen(o=>!o)}>
-      <div className="bhf" style={{transform:`scaleX(${pct/100})`}}/>
-      <div className="bhl"><span className="be">{block.emoji}</span><div><div className="btl">{block.label}</div><div className="bti">{block.time}</div></div></div>
-      <div className="bhr"><span className={`bp${all?" dn":""}`}>{all?"✓ Done":`${comp.length}/${mand.length}`}</span><span className={`bc${open?" op":""}`}>▼</span></div>
+  const allDone=pct===100&&mand.length>0;
+  const open=blockOpen[block.id]!==undefined?blockOpen[block.id]:(block.id==="morning"||block.id==="midday");
+
+  return(
+    <div className="tblk">
+      <div className="bh" onClick={onToggle}>
+        <div className="bhf" style={{transform:`scaleX(${pct/100})`}}/>
+        <div className="bhl">
+          <span className="be">{block.emoji}</span>
+          <div><div className="btl">{block.label}</div><div className="bti">{block.time}</div></div>
+        </div>
+        <div className="bhr">
+          <span className={`bpill${allDone?" dn":""}`}>{allDone?"✓ Done":`${comp.length}/${mand.length}`}</span>
+          <span className={`bc${open?" op":""}`}>▼</span>
+        </div>
+      </div>
+      {open&&(
+        <div className="bts">
+          {blockTasks.map(task=>{
+            if(task.category==="tracking"){
+              const done=dayData.completed?.[task.id];
+              const fields=task.id==="sym-morning"?MF:task.id==="sym-midday"?DF:EF;
+              if(done)return(
+                <div key={task.id} style={{display:"flex",borderRadius:11,overflow:"hidden",marginBottom:8,border:"1px solid rgba(74,107,74,.2)"}}>
+                  <div style={{width:50,background:DONE_PANEL,display:"flex",alignItems:"center",justifyContent:"center",fontSize:".85rem",color:"rgba(255,255,255,.9)"}}>✓</div>
+                  <div style={{flex:1,background:DONE_BG,padding:"7px 11px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span style={{fontSize:".74rem",color:"var(--mu)",textDecoration:"line-through"}}>{task.name}</span>
+                    <button className="tmin-undo" onClick={()=>onUndo(task.id)}>undo</button>
+                  </div>
+                </div>
+              );
+              return<SymLog key={task.id} title={task.name} fields={fields} data={dayData.symptoms||{}} onChange={onSymChange} onSave={()=>onSymSave(task.id)}/>;
+            }
+            const done=dayData.completed?.[task.id];
+            const time=dayData.times?.[task.id];
+            return<TaskCard key={task.id} task={task} done={done} time={time} onComplete={()=>onComplete(task.id)} onUndo={()=>onUndo(task.id)} onSheet={()=>onSheet(task)}/>;
+          })}
+        </div>
+      )}
     </div>
-    {open&&<div className="bts">
-      {bt.map(task=>{
-        if(task.category==="tracking"){
-          const done=dayData.completed?.[task.id];
-          const fields=task.id==="sym-morning"?MF:task.id==="sym-midday"?DF:EF;
-          if(done)return <div key={task.id} className="tc2 cmp"><div className="tmin"><span className="tmc2">✓</span><span className="tmn">{task.name}</span><button className="tmu" onClick={()=>onUndo(task.id)}>undo</button></div></div>;
-          return <SymLog key={task.id} title={task.name} fields={fields} data={dayData.symptoms||{}} onChange={onSymChange} onSave={()=>onSymSave(task.id)}/>;
-        }
-        const done=dayData.completed?.[task.id];
-        const cat=CATS[task.category];
-        if(done)return <div key={task.id} className="tc2 cmp"><div className="tmin"><span className="tmc2">✓</span><span className="tmn">{task.name}</span><button className="tmu" onClick={()=>onUndo(task.id)}>undo</button></div></div>;
-        return <div key={task.id} className="tc2 fade"><div className="tci"><div className="tcd" style={{background:cat?.color}}/><div className="ti"><div className="tn">{task.name}</div><div className="tm"><span className="tinst">{task.instruction}</span>{task.duration!=="—"&&<span className="tdu">· {task.duration}</span>}</div><div className="tm" style={{marginTop:2}}><span className={`pb2 ${task.priority}`}>{PRI[task.priority]}</span></div></div><div className="ta"><button className="tbtn tbtn-c" onClick={()=>onSheet(task)}>✎</button><button className="tbtn tbtn-d" onClick={()=>onComplete(task.id)}>✓</button></div></div></div>;
-      })}
-    </div>}
-  </div>;
+  );
 }
 
-function SupTab({custom,onAdd,onToggle}){
-  const[show,setShow]=useState(false);
-  const[form,setForm]=useState({name:"",dose:"",timing:"",notes:"",active:true});
-  const builtin=TASKS.filter(t=>t.category==="supplements"&&!t.hidden);
-  const save=()=>{if(!form.name)return;onAdd({...form,id:"cs-"+Date.now()});setForm({name:"",dose:"",timing:"",notes:"",active:true});setShow(false);};
-  return <div className="ref">
-    <div className="ph"><div className="ptl">Supplements</div><div className="ps">Active protocol · Reference</div></div>
-    <div className="sdv">Current Protocol</div>
-    {builtin.map(t=>{const d=SDESC[t.id];return <div key={t.id} className="sc2"><div className="sch"><div className="sn">{d?.n||t.name}</div><button className="stog on"/></div><div className="sm2">{d?.t||t.instruction}</div>{d&&<div className="sp2">{d.p}</div>}</div>;})}
-    {custom.map(s=><div key={s.id} className="sc2"><div className="sch"><div className="sn">{s.name}</div><button className={`stog${s.active?" on":" off"}`} onClick={()=>onToggle(s.id)}/></div><div className="sm2">{s.dose} · {s.timing}</div>{s.notes&&<div className="sp2">{s.notes}</div>}</div>)}
-    <button className="asb" onClick={()=>setShow(x=>!x)}>+ Add Supplement</button>
-    {show&&<div className="adf fade">
-      <div className="fr"><div className="ff"><label className="fl">Name</label><input className="fi" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="Supplement name"/></div><div className="ff"><label className="fl">Dose</label><input className="fi" value={form.dose} onChange={e=>setForm(f=>({...f,dose:e.target.value}))} placeholder="e.g. 2 caps"/></div></div>
-      <div className="ff"><label className="fl">Timing</label><input className="fi" value={form.timing} onChange={e=>setForm(f=>({...f,timing:e.target.value}))} placeholder="e.g. With breakfast"/></div>
-      <div className="ff"><label className="fl">Notes / Purpose</label><input className="fi" value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="What it's for..."/></div>
-      <div className="fact"><button className="fcl" onClick={()=>setShow(false)}>Cancel</button><button className="fsv" onClick={save}>Save</button></div>
-    </div>}
-    <div className="sdv" style={{marginTop:8}}>Ayurvedic Herbs — Planned</div>
-    {HERBS.map(h=><div key={h.name} className="hc"><div className="hn">{h.name}</div><div className="hm">{h.dose} · {h.timing}</div><div className="hp">{h.purpose}</div><span className="hs2">Planned — not yet active</span></div>)}
-  </div>;
+// ─── REFERENCE TAB TEMPLATE ──────────────────────────────────────────────────
+function RefTab({title,subtitle,categoryFilter,allTasks,onAddToday,onEditTask,extraContent}){
+  const[editingId,setEditingId]=useState(null);
+  const[showArchived,setShowArchived]=useState(false);
+  const active=allTasks.filter(t=>t.category===categoryFilter&&!t.archived&&!t.hidden);
+  const archived=allTasks.filter(t=>t.category===categoryFilter&&t.archived);
+
+  return(
+    <div className="ref">
+      <div className="ph"><div className="ptl">{title}</div><div className="ps">{subtitle}</div></div>
+      {extraContent}
+      <div className="sdv">Activities</div>
+      {active.map(task=>(
+        editingId===task.id
+          ?<EditForm key={task.id} task={task} onSave={f=>{onEditTask(task.id,f);setEditingId(null);}} onCancel={()=>setEditingId(null)}/>
+          :<LibCard key={task.id} task={task} onAddToday={()=>onAddToday(task)} onEdit={()=>setEditingId(task.id)}/>
+      ))}
+      {archived.length>0&&(
+        <>
+          <button style={{background:"none",border:"none",cursor:"pointer",fontSize:".72rem",color:"var(--mu)",padding:"4px 0",marginBottom:6}} onClick={()=>setShowArchived(x=>!x)}>
+            {showArchived?"▼":"▶"} Archived ({archived.length})
+          </button>
+          {showArchived&&archived.map(task=>(
+            editingId===task.id
+              ?<EditForm key={task.id} task={task} onSave={f=>{onEditTask(task.id,f);setEditingId(null);}} onCancel={()=>setEditingId(null)}/>
+              :<LibCard key={task.id} task={task} onAddToday={()=>onAddToday(task)} onEdit={()=>setEditingId(task.id)} showAdd={false}/>
+          ))}
+        </>
+      )}
+    </div>
+  );
 }
 
-function DietTab(){return <div className="ref"><div className="ph"><div className="ptl">Diet</div><div className="ps">Vata-pacifying nutrition protocol</div></div><div className="rc3"><div className="rcs">Daily Meal Template</div><ul className="rl"><li>On waking: warm water + ginger + lemon</li><li>Breakfast 07:30: warm oats, ghee, cardamom, banana</li><li>Lunch 12:30: main meal — grain + protein + root veg + ghee</li><li>Dinner 18:30: light — soup, kitchari, or stew</li><li>Before bed: warm herbal drink</li></ul></div><div className="rc3"><div className="rcs">Eat More Of</div><ul className="rl">{DIET.eatMore.map(i=><li key={i}>{i}</li>)}</ul></div><div className="rc3"><div className="rcs">Reduce or Avoid</div><ul className="rl av">{DIET.avoid.map(i=><li key={i}>{i}</li>)}</ul></div><div className="rc3"><div className="rcs">Daily Spices</div><ul className="rl">{DIET.spices.map(i=><li key={i}>{i}</li>)}</ul></div></div>;}
+// ─── SUPPLEMENTS TAB ─────────────────────────────────────────────────────────
+function SupplementsTab({allTasks,customSupps,onAdd,onUpdate,onDelete,onEditTask}){
+  const[showForm,setShowForm]=useState(false);
+  const[editingId,setEditingId]=useState(null);
+  const builtinSupps=allTasks.filter(t=>t.category==="supplements"&&!t.archived&&!t.hidden&&!t.id.startsWith("cs-"));
+  const archivedBuiltin=allTasks.filter(t=>t.category==="supplements"&&t.archived);
+  const[showArchived,setShowArchived]=useState(false);
 
-function MovTab(){const p=TASKS.filter(t=>t.category==="movement"&&!t.hidden);return <div className="ref"><div className="ph"><div className="ptl">Movement</div><div className="ps">Vyayama — Vata-grounding</div></div><div className="rc3"><div className="rct">Principles</div><ul className="rl"><li>Train at ~50% max capacity on depleted days</li><li>Warm up 10 min minimum before every session</li><li>Slow eccentric — 3–4 sec on lowering phase</li><li>Enforce 2–3 min rest between heavy sets</li><li>Zone 2: stay nasal breathing throughout</li><li>Stop if: mouth breathing, joint dryness, fog increase</li></ul></div>{p.map(t=><div key={t.id} className="rc3"><div className="rct">{t.name}</div><div className="sm2">{t.instruction} · {t.duration} · <span className={`pb2 ${t.priority}`}>{PRI[t.priority]}</span></div>{t.videos?.map((u,i)=><a key={i} href={u} target="_blank" rel="noopener noreferrer" className="vl" style={{marginTop:8}}>▶ Video Guide {t.videos.length>1?i+1:""}</a>)}</div>)}</div>;}
+  return(
+    <div className="ref">
+      <div className="ph"><div className="ptl">Supplements</div><div className="ps">Active protocol · Manage & reference</div></div>
+      <div className="sdv">Protocol Supplements</div>
+      {builtinSupps.map(t=>(
+        editingId===t.id
+          ?<EditForm key={t.id} task={t} isSupp={true} onSave={f=>{onEditTask(t.id,f);setEditingId(null);}} onCancel={()=>setEditingId(null)}/>
+          :<div key={t.id} className="sc2">
+            <div className="sch"><div className="sn">{t.name}</div></div>
+            <div className="sm2">{t.dose?" · "+t.dose:""}{t.timing?" · "+t.timing:t.instruction?" · "+t.instruction:""} · <span className={`pb2 ${t.priority}`}>{PRI_COLORS[t.priority]?.label}</span></div>
+            {(t.notes||t.purpose)&&<div className="sp2">{t.notes||t.purpose}</div>}
+            {(t.scent||t.sound)&&<div style={{marginTop:4,fontSize:".65rem",color:"#7A6230"}}>{t.scent&&"🌸 "+t.scent}{t.sound&&" · 🎵 "+t.sound}</div>}
+            <div className="supp-actions">
+              <button className="supp-btn supp-btn-edit" onClick={()=>setEditingId(t.id)}>✎ Edit</button>
+              <button className="supp-btn supp-btn-arch" onClick={()=>onEditTask(t.id,{archived:true})}>Archive</button>
+            </div>
+          </div>
+      ))}
+      <div className="sdv" style={{marginTop:4}}>Custom Supplements</div>
+      {customSupps.map(s=>(
+        editingId===s.id
+          ?<EditForm key={s.id} task={s} isSupp={true} onSave={f=>{onUpdate(s.id,{...f,active:f.active!==false});setEditingId(null);}} onCancel={()=>setEditingId(null)}/>
+          :<div key={s.id} className="sc2">
+            <div className="sch">
+              <div className="sn">{s.name}</div>
+              <button className={`stog${s.active!==false?" on":" off"}`} onClick={()=>onUpdate(s.id,{active:s.active===false})}/>
+            </div>
+            <div className="sm2">{s.dose&&s.dose+" · "}{s.timing&&s.timing+" · "}<span className={`pb2 ${s.priority||"optional"}`}>{PRI_COLORS[s.priority||"optional"]?.label}</span> · {CAT_COLORS[s.block]?.label||s.block}</div>
+            {s.notes&&<div className="sp2">{s.notes}</div>}
+            <div className="supp-actions">
+              <button className="supp-btn supp-btn-edit" onClick={()=>setEditingId(s.id)}>✎ Edit</button>
+              <button className="supp-btn supp-btn-arch" onClick={()=>onUpdate(s.id,{active:false,archived:true})}>Archive</button>
+              <button className="supp-btn supp-btn-del" onClick={()=>{if(window.confirm("Delete permanently?"))onDelete(s.id);}}>Delete</button>
+            </div>
+          </div>
+      ))}
+      <button className="asb" onClick={()=>setShowForm(x=>!x)}>+ Add Supplement</button>
+      {showForm&&(
+        <EditForm
+          task={{name:"",dose:"",timing:"",block:"morning",priority:"optional",category:"supplements",scent:"",sound:"",notes:"",active:true}}
+          isSupp={true}
+          onSave={f=>{onAdd({...f,id:"cs-"+Date.now(),active:true,category:"supplements",noTimer:true});setShowForm(false);}}
+          onCancel={()=>setShowForm(false)}
+        />
+      )}
+      {archivedBuiltin.length>0&&(
+        <>
+          <button style={{background:"none",border:"none",cursor:"pointer",fontSize:".72rem",color:"var(--mu)",padding:"4px 0",marginBottom:6}} onClick={()=>setShowArchived(x=>!x)}>
+            {showArchived?"▼":"▶"} Archived ({archivedBuiltin.length})
+          </button>
+          {showArchived&&archivedBuiltin.map(t=>(
+            <div key={t.id} className="sc2" style={{opacity:.6}}>
+              <div className="sch"><div className="sn">{t.name}</div></div>
+              <div className="supp-actions">
+                <button className="supp-btn supp-btn-edit" onClick={()=>onEditTask(t.id,{archived:false})}>Restore</button>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
+      <div className="sdv" style={{marginTop:4}}>Ayurvedic Herbs — Planned</div>
+      {HERBS.map(h=><div key={h.name} className="hc"><div className="hn">{h.name}</div><div className="hm">{h.dose} · {h.timing}</div><div className="hp">{h.purpose}</div><span className="hs2">Planned — not yet active</span></div>)}
+    </div>
+  );
+}
 
-function BwTab(){const p=TASKS.filter(t=>t.category==="breathwork"&&!t.hidden);return <div className="ref"><div className="ph"><div className="ptl">Breathwork</div><div className="ps">Pranayama — Vata regulation</div></div><div className="rc3"><div className="rct">Avoid These Practices</div><ul className="rl av"><li>Kapalabhati — strongly Vata aggravating</li><li>Wim Hof / hyperventilation — cortisol spike</li><li>Breath of Fire — depleting for your type</li><li>Long breath retentions — triggers anxiety in Vata</li></ul></div>{p.map(t=><div key={t.id} className="rc3"><div className="rct">{t.name}</div><div className="sm2">{t.instruction} · {t.duration} · <span className={`pb2 ${t.priority}`}>{PRI[t.priority]}</span></div>{t.videos?.map((u,i)=><a key={i} href={u} target="_blank" rel="noopener noreferrer" className="vl" style={{marginTop:8}}>▶ Video Guide {t.videos.length>1?i+1:""}</a>)}</div>)}</div>;}
-
-function BodyTab(){const p=TASKS.filter(t=>t.category==="bodywork"&&!t.hidden);return <div className="ref"><div className="ph"><div className="ptl">Bodywork</div><div className="ps">Abhyanga and therapeutic bodywork</div></div><div className="rc3"><div className="rct">Abhyanga Sequence</div><ul className="rl"><li>Warm sesame oil — stand bottle in hot water 5 min</li><li>Crown and scalp — circular, 2 min</li><li>Neck and shoulders — upward strokes toward clavicle, 4 min</li><li>Arms — long strokes toward heart, 2 min</li><li>Abdomen — clockwise circles, 3 min</li><li>Back and lower back, 2 min</li><li>Legs — long strokes toward heart, 3 min</li><li>Feet — firm pressure on soles, 4 min</li><li>Leave on 10–15 min, then warm shower</li></ul></div><div className="rc3"><div className="rcs">Heating Device</div><ul className="rl"><li>15–20 min on neck/shoulders, morning or evening</li><li>Moist heat preferred — damp cloth between device and skin</li><li>Combine with Nadi Shodhana for amplified effect</li></ul></div><div className="rc3"><div className="rcs">Cooling Mask</div><ul className="rl"><li>During active headache or head pressure only</li><li>10–15 min max, lying down with legs elevated</li><li>Combine with Bhramari breathing</li><li>Do not use daily — restricts cervical lymphatic flow</li></ul></div>{p.map(t=><div key={t.id} className="rc3"><div className="rct">{t.name}</div><div className="sm2">{t.instruction} · {t.duration}</div>{t.videos?.map((u,i)=><a key={i} href={u} target="_blank" rel="noopener noreferrer" className="vl" style={{marginTop:8}}>▶ Video Guide {t.videos.length>1?i+1:""}</a>)}</div>)}</div>;}
-
-function AyuTab(){return <div className="ref"><div className="ph"><div className="ptl">Ayurveda</div><div className="ps">Your constitutional assessment</div></div><div className="db"><div className="dp">Vata – Kapha</div><div className="ds2">Prakriti · Constitutional Type</div><div className="dd">Vata is dominant: lean frame, cold extremities, dry skin, racing mind, anxiety under stress. Kapha secondary — currently compensatory stagnation. Treatment targets the imbalance, not just the constitution.</div></div><div className="rc3"><div className="rct">Current Imbalance (Vikriti)</div><ul className="rl"><li>Vata severely aggravated — depleted Prana Vata</li><li>Kapha accumulation as compensatory response</li><li>Brain fog → disturbed Prana and Udana Vata</li><li>Cold extremities → Vyana Vata imbalance</li><li>Unrefreshing sleep → nervous system too dysregulated</li><li>Cervical tension → Vata dryness and constriction</li><li>Difficulty gaining muscle → Vata consumes tissue faster than built</li></ul></div><div className="rc3"><div className="rct">The Core Principle</div><div className="dd" style={{marginTop:0}}>Like increases like. Opposites create balance. Vata is dry, light, cold, mobile. Eat and live with the opposite: warm, heavy, oily, smooth, grounding. You need more of what you are missing, not more of what you already have in excess.</div></div><div className="rc3"><div className="rct">Vata Aggravators</div><ul className="rl av"><li>Irregular meal times and skipping meals</li><li>Irregular sleep and wake times</li><li>Cold, raw, dry foods</li><li>Excessive or depleting exercise</li><li>Overstimulation — screens, noise, multi-tasking</li><li>Cold environments without adequate warming</li><li>Rushing and erratic scheduling</li></ul></div><div className="rc3"><div className="rct">Key Herbs</div>{HERBS.map(h=><div key={h.name} className="hc" style={{marginBottom:8}}><div className="hn">{h.name}</div><div className="hm">{h.dose} · {h.timing}</div><div className="hp">{h.purpose}</div></div>)}</div></div>;}
-
+// ─── WEEKLY SUMMARY ──────────────────────────────────────────────────────────
 function WeekTab({allData}){
   const days=[];
   for(let i=6;i>=0;i--){
-    const d=new Date(Date.now()-i*86400000);const ds=fd(d);
+    const d=new Date(Date.now()-i*86400000);const ds=fmtDate(d);
     const data=allData[ds]||{completed:{},symptoms:{}};
-    const mand=TASKS.filter(t=>t.priority==="mandatory"&&t.category!=="tracking");
+    const mand=DEFAULT_TASKS.filter(t=>t.priority==="mandatory"&&t.category!=="tracking");
     const comp=mand.filter(t=>data.completed?.[t.id]);
     const pct=mand.length>0?Math.round((comp.length/mand.length)*100):0;
     days.push({ds,label:d.toLocaleDateString("en-GB",{weekday:"short"}),pct,sym:data.symptoms||{}});
   }
-  const keys=[{key:"fog",label:"Fog",color:"#7A9BB5"},{key:"energy",label:"Energy",color:"#6B8F6B"},{key:"tension",label:"Tension",color:"#C4724A"},{key:"sleepQuality",label:"Sleep",color:"#9B8BB4"},{key:"mood",label:"Mood",color:"#C49A3A"}];
-  return <div className="ref">
-    <div className="ph"><div className="ptl">Weekly Summary</div><div className="ps">Last 7 days</div></div>
-    <div className="rc3"><div className="rct">Protocol Completion</div><div className="wg" style={{marginTop:12}}>{days.map(day=><div key={day.ds} className="wdc"><div className="wdl">{day.label}</div><div className="wdb"><div className="wbf" style={{height:`${day.pct}%`,background:day.pct>70?"var(--fo)":day.pct>40?"var(--oc)":"var(--tc)"}}/></div><div className="wdp">{day.pct}%</div></div>)}</div></div>
-    {keys.map(sk=>{
-      const vals=days.map(d=>d.sym[sk.key]?Number(d.sym[sk.key]):null);
-      if(!vals.some(v=>v!==null))return null;
-      const w=100/7,pts=vals.map((v,i)=>v!==null?`${i*w+w/2},${((5-v)/4)*60+10}`:null).filter(Boolean);
-      return <div key={sk.key} className="sch3"><div className="ctl">{sk.label}</div><div className="cls"><svg className="csvg" viewBox="0 0 100 80" preserveAspectRatio="none">{[1,2,3,4,5].map(v=><line key={v} x1="0" y1={((5-v)/4)*60+10} x2="100" y2={((5-v)/4)*60+10} stroke="rgba(154,138,120,.15)" strokeWidth="0.5"/>)}{pts.length>1&&<polyline points={pts.join(" ")} fill="none" stroke={sk.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>}{vals.map((v,i)=>v!==null?<circle key={i} cx={i*w+w/2} cy={((5-v)/4)*60+10} r="2.5" fill={sk.color}/>:null)}</svg></div></div>;
-    })}
-  </div>;
+  const keys=[{key:"fog",label:"Fog",color:"#7A9BB5"},{key:"energy",label:"Energy",color:"#6B8F6B"},{key:"tension",label:"Tension",color:"#8B4A2A"},{key:"sleepQuality",label:"Sleep",color:"#9B8BB4"},{key:"mood",label:"Mood",color:"#7A6230"}];
+  return(
+    <div className="ref">
+      <div className="ph"><div className="ptl">Weekly Summary</div><div className="ps">Last 7 days</div></div>
+      <div className="rc3">
+        <div className="rct">Protocol Completion</div>
+        <div className="wg" style={{marginTop:10}}>
+          {days.map(day=>(
+            <div key={day.ds} className="wdc">
+              <div className="wdl">{day.label}</div>
+              <div className="wdb"><div className="wbf" style={{height:`${day.pct}%`,background:day.pct>70?"#4A6B4A":day.pct>40?"#7A6230":"#8B4A2A"}}/></div>
+              <div className="wdp">{day.pct}%</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      {keys.map(sk=>{
+        const vals=days.map(d=>d.sym[sk.key]?Number(d.sym[sk.key]):null);
+        if(!vals.some(v=>v!==null))return null;
+        const w=100/7,pts=vals.map((v,i)=>v!==null?`${i*w+w/2},${((5-v)/4)*56+8}`:null).filter(Boolean);
+        return(
+          <div key={sk.key} className="sch3">
+            <div className="ctl">{sk.label}</div>
+            <div className="cls">
+              <svg className="csvg" viewBox="0 0 100 72" preserveAspectRatio="none">
+                {[1,2,3,4,5].map(v=><line key={v} x1="0" y1={((5-v)/4)*56+8} x2="100" y2={((5-v)/4)*56+8} stroke="rgba(36,28,20,.1)" strokeWidth="0.5"/>)}
+                {pts.length>1&&<polyline points={pts.join(" ")} fill="none" stroke={sk.color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>}
+                {vals.map((v,i)=>v!==null?<circle key={i} cx={i*w+w/2} cy={((5-v)/4)*56+8} r="2.5" fill={sk.color}/>:null)}
+              </svg>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
-function SetTab({allData,custom}){
+// ─── SETTINGS TAB ────────────────────────────────────────────────────────────
+function SetTab({allData,customSupps,taskOverrides,customTasks}){
   const expCSV=()=>{
-    const rows=[["Date","Task","Completed","Comment","Fog","Energy","Tension","Sleep","Mood","HRV","RHR"]];
-    Object.entries(allData).forEach(([date,data])=>{TASKS.forEach(t=>{if(data.completed?.[t.id])rows.push([date,t.name,"Yes",data.comments?.[t.id]||"",data.symptoms?.fog||"",data.symptoms?.energy||"",data.symptoms?.tension||"",data.symptoms?.sleepQuality||"",data.symptoms?.mood||"",data.symptoms?.hrv||"",data.symptoms?.rhr||""]);});});
-    const csv=rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n");
-    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=`protocol_${fd(new Date())}.csv`;a.click();
+    const rows=[["Date","Task","Completed","Time","Comment","Fog","Energy","Tension","Sleep","Mood","HRV","RHR"]];
+    Object.entries(allData).forEach(([date,data])=>{
+      DEFAULT_TASKS.forEach(t=>{
+        if(data.completed?.[t.id])rows.push([date,t.name,"Yes",data.times?.[t.id]||"",data.comments?.[t.id]||"",data.symptoms?.fog||"",data.symptoms?.energy||"",data.symptoms?.tension||"",data.symptoms?.sleepQuality||"",data.symptoms?.mood||"",data.symptoms?.hrv||"",data.symptoms?.rhr||""]);
+      });
+    });
+    const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=`protocol_${todayStr()}.csv`;a.click();
   };
   const expJSON=()=>{
-    const s={version:"1.0",date:fd(new Date()),allData,customSupplements:custom};
-    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(s,null,2)],{type:"application/json"}));a.download=`protocol_state_${fd(new Date())}.json`;a.click();
+    const s={version:"1.2",date:todayStr(),allData,customSupplements:customSupps,taskOverrides,customTasks};
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(s,null,2)],{type:"application/json"}));a.download=`protocol_state_${todayStr()}.json`;a.click();
   };
   const impJSON=e=>{
     const f=e.target.files[0];if(!f)return;
     const reader=new FileReader();
-    reader.onload=ev=>{try{const s=JSON.parse(ev.target.result);if(s.allData){Object.entries(s.allData).forEach(([d,data])=>sd(d,data));if(s.customSupplements)localStorage.setItem("customSupplements",JSON.stringify(s.customSupplements));alert("Import successful — please reload the app.");}else alert("Invalid file format");}catch{alert("Import failed — invalid JSON");}};
+    reader.onload=ev=>{
+      try{
+        const s=JSON.parse(ev.target.result);
+        if(s.allData)Object.entries(s.allData).forEach(([d,data])=>saveDay(d,data));
+        if(s.customSupplements)lsSet("customSupplements2",s.customSupplements);
+        if(s.taskOverrides)lsSet("taskOverrides",s.taskOverrides);
+        if(s.customTasks)lsSet("customTasks",s.customTasks);
+        alert("Import successful — please reload the app.");
+      }catch{alert("Import failed — invalid JSON file");}
+    };
     reader.readAsText(f);
   };
-  return <div style={{padding:16}}>
-    <div className="ph"><div className="ptl">Settings</div><div className="ps">Export, import, and app info</div></div>
-    <div className="sdv">Export</div>
-    <button className="setb" onClick={expCSV}><span className="si">📊</span>Export logs as CSV</button>
-    <button className="setb" onClick={expJSON}><span className="si">💾</span>Export full app state as JSON</button>
-    <div className="sdv">Import</div>
-    <label className="setb" style={{cursor:"pointer"}}><span className="si">📥</span>Import JSON (restore state)<input type="file" accept=".json" style={{display:"none"}} onChange={impJSON}/></label>
-    <div className="sdv">About</div>
-    <div className="rc3"><div className="rct">Nelson's Integrated Protocol</div><div className="sm2">Version 1.0 · PWA</div><div className="sp2">Integrates Ayurvedic practices, training protocol, supplement schedule, and daily wellness tracking.</div><div className="sp2" style={{marginTop:8,color:"var(--tc)"}}>📱 To install on iPhone: tap Share in Safari → Add to Home Screen</div></div>
-  </div>;
+  return(
+    <div style={{padding:14}}>
+      <div className="ph"><div className="ptl">Settings</div><div className="ps">Export, import, and app info</div></div>
+      <div className="sdv">Export</div>
+      <button className="setb" onClick={expCSV}><span className="si">📊</span>Export logs as CSV</button>
+      <button className="setb" onClick={expJSON}><span className="si">💾</span>Export full app state as JSON</button>
+      <div className="sdv">Import</div>
+      <label className="setb" style={{cursor:"pointer"}}><span className="si">📥</span>Import JSON (restore state)<input type="file" accept=".json" style={{display:"none"}} onChange={impJSON}/></label>
+      <div className="sdv">About</div>
+      <div className="rc3">
+        <div className="rct">Nelson's Integrated Protocol</div>
+        <div className="sm2">Version 1.2 · PWA</div>
+        <div className="sp2">Integrates Ayurvedic practices, training protocol, supplement schedule, and daily wellness tracking.</div>
+        <div className="sp2" style={{marginTop:7,color:"#8B4A2A"}}>📱 To install on iPhone: tap Share in Safari → Add to Home Screen</div>
+      </div>
+    </div>
+  );
 }
 
+// ─── SCENT & SOUND TAB ───────────────────────────────────────────────────────
+function ScentSoundTab(){
+  return(
+    <div className="ref">
+      <div className="ph"><div className="ptl">Scent & Sound</div><div className="ps">Gandha Chikitsa · Nada Yoga</div></div>
+      <div className="rc3"><div className="rct">How It Works</div><div className="dd" style={{marginTop:0}}>Scent acts directly on Prana Vata through the olfactory nerve — the only sensory pathway with a direct line to the limbic system and hypothalamus. Sound operates through Shabda (vibration) acting on the vagus nerve. Both are among the fastest routes to shifting autonomic state — more immediate than diet or herbs.</div></div>
+      <div className="sdv">Recommended Scents</div>
+      {SCENT_DATA.scents.map(s=>(
+        <div key={s.name} className="rc3">
+          <div className="rct">🌸 {s.name}</div>
+          <div className="sm2">{s.quality} · {s.use}</div>
+          <div style={{fontSize:".68rem",color:"#7A6230",marginBottom:4}}>{s.timing}</div>
+          <div className="sp2">{s.benefit}</div>
+        </div>
+      ))}
+      <div className="rc3"><div className="rct">Scents to Avoid</div><ul className="rl av"><li>Camphor — light, cold, dispersing</li><li>Eucalyptus — cooling and stimulating</li><li>Peppermint — cold and light, not for daily use</li></ul></div>
+      <div className="sdv">Recommended Sounds</div>
+      {SCENT_DATA.sounds.map(s=>(
+        <div key={s.name} className="rc3">
+          <div className="rct">🎵 {s.name}</div>
+          <div className="sm2">{s.type} · {s.timing}</div>
+          <div className="sp2" style={{marginBottom:7}}>{s.benefit}</div>
+          <a href={s.url} target="_blank" rel="noopener noreferrer" className="vl">▶ Search / Listen</a>
+        </div>
+      ))}
+      <div className="rc3"><div className="rct">Daily Guide</div><ul className="rl"><li>Morning correctives: cardamom or frankincense + Raga Bhairav</li><li>Abhyanga: sandalwood or vetiver + singing bowl</li><li>Breathwork: frankincense + silence or singing bowl</li><li>Yin yoga: sandalwood + Raga Yaman</li><li>Foot oil: vetiver drop in sesame + nature sounds</li><li>Acute fog: frankincense direct inhale + SA TA NA MA</li></ul></div>
+    </div>
+  );
+}
+
+// ─── AYURVEDA TAB ────────────────────────────────────────────────────────────
+function AyuTab(){
+  return(
+    <div className="ref">
+      <div className="ph"><div className="ptl">Ayurveda</div><div className="ps">Your constitutional assessment</div></div>
+      <div className="db"><div className="dp">Vata – Kapha</div><div className="ds2">Prakriti · Constitutional Type</div><div className="dd">Vata is dominant: lean frame, cold extremities, dry skin, racing mind, anxiety under stress. Kapha secondary — currently showing as compensatory stagnation. Treatment targets the imbalance, not just the constitution.</div></div>
+      <div className="rc3"><div className="rct">Current Imbalance (Vikriti)</div><ul className="rl"><li>Vata severely aggravated — depleted Prana Vata</li><li>Kapha accumulation as compensatory response</li><li>Brain fog → disturbed Prana and Udana Vata</li><li>Cold extremities → Vyana Vata imbalance</li><li>Unrefreshing sleep → nervous system too dysregulated</li><li>Cervical tension → Vata dryness and constriction</li><li>Difficulty gaining muscle → Vata consumes tissue faster than built</li></ul></div>
+      <div className="rc3"><div className="rct">The Core Principle</div><div className="dd" style={{marginTop:0}}>Like increases like. Opposites create balance. Vata is dry, light, cold, mobile. Eat and live with the opposite: warm, heavy, oily, smooth, grounding. You need more of what you are missing, not more of what you already have in excess.</div></div>
+      <div className="rc3"><div className="rct">Vata Aggravators</div><ul className="rl av"><li>Irregular meal times and skipping meals</li><li>Irregular sleep and wake times</li><li>Cold, raw, dry foods</li><li>Excessive or depleting exercise</li><li>Overstimulation — screens, noise, multi-tasking</li><li>Cold environments without adequate warming</li><li>Rushing and erratic scheduling</li></ul></div>
+      <div className="rc3"><div className="rct">Key Herbs — Planned</div>{HERBS.map(h=><div key={h.name} className="hc" style={{marginBottom:7}}><div className="hn">{h.name}</div><div className="hm">{h.dose} · {h.timing}</div><div className="hp">{h.purpose}</div></div>)}</div>
+    </div>
+  );
+}
+
+function DietTab({allTasks,onAddToday,onEditTask}){
+  return(
+    <RefTab title="Diet" subtitle="Vata-pacifying nutrition protocol" categoryFilter="diet" allTasks={allTasks} onAddToday={onAddToday} onEditTask={onEditTask}
+      extraContent={<>
+        <div className="rc3" style={{margin:"0 0 10px"}}><div className="rcs">Daily Meal Template</div><ul className="rl"><li>On waking: warm water + ginger + lemon</li><li>Breakfast 07:30: warm oats, ghee, cardamom, banana</li><li>Lunch 12:30: main meal — grain + protein + root veg + ghee</li><li>Dinner 18:30: light — soup, kitchari, or stew</li><li>Before bed: warm herbal drink</li></ul></div>
+        <div className="rc3" style={{margin:"0 0 10px"}}><div className="rcs">Eat More Of</div><ul className="rl">{DIET_DATA.eatMore.map(i=><li key={i}>{i}</li>)}</ul></div>
+        <div className="rc3" style={{margin:"0 0 10px"}}><div className="rcs">Reduce or Avoid</div><ul className="rl av">{DIET_DATA.avoid.map(i=><li key={i}>{i}</li>)}</ul></div>
+      </>}
+    />
+  );
+}
+
+function MovTab({allTasks,onAddToday,onEditTask}){
+  return(
+    <RefTab title="Movement" subtitle="Vyayama — Vata-grounding movement" categoryFilter="movement" allTasks={allTasks} onAddToday={onAddToday} onEditTask={onEditTask}
+      extraContent={<div className="rc3" style={{margin:"0 0 10px"}}><div className="rct">Principles</div><ul className="rl"><li>Train at ~50% max capacity on depleted days</li><li>Warm up 10 min minimum</li><li>Slow eccentric — 3–4 sec on lowering phase</li><li>Enforce 2–3 min rest between heavy sets</li><li>Zone 2: stay nasal breathing throughout</li><li>Stop if: mouth breathing, joint dryness, fog increase</li></ul></div>}
+    />
+  );
+}
+
+function BwTab({allTasks,onAddToday,onEditTask}){
+  return(
+    <RefTab title="Breathwork" subtitle="Pranayama — Vata regulation" categoryFilter="breathwork" allTasks={allTasks} onAddToday={onAddToday} onEditTask={onEditTask}
+      extraContent={<div className="rc3" style={{margin:"0 0 10px"}}><div className="rct">Avoid These Practices</div><ul className="rl av"><li>Kapalabhati — strongly Vata aggravating</li><li>Wim Hof / hyperventilation — cortisol spike</li><li>Breath of Fire — depleting for your type</li><li>Long breath retentions — triggers anxiety</li></ul></div>}
+    />
+  );
+}
+
+function BodyTab({allTasks,onAddToday,onEditTask}){
+  return(
+    <RefTab title="Bodywork" subtitle="Abhyanga & therapeutic bodywork" categoryFilter="bodywork" allTasks={allTasks} onAddToday={onAddToday} onEditTask={onEditTask}
+      extraContent={<>
+        <div className="rc3" style={{margin:"0 0 10px"}}><div className="rct">Abhyanga Sequence</div><ul className="rl"><li>Warm sesame oil — stand bottle in hot water 5 min</li><li>Crown and scalp — circular, 2 min</li><li>Neck and shoulders — upward strokes, 4 min</li><li>Arms — long strokes toward heart, 2 min</li><li>Abdomen — clockwise circles, 3 min</li><li>Legs — long strokes toward heart, 3 min</li><li>Feet — firm pressure on soles, 4 min</li><li>Leave on 10–15 min, then warm shower</li></ul></div>
+        <div className="rc3" style={{margin:"0 0 10px"}}><div className="rcs">Heating Device</div><ul className="rl"><li>15–20 min on neck/shoulders, morning or evening</li><li>Moist heat preferred</li><li>Do Abhyanga on neck first, then apply heat</li></ul></div>
+      </>}
+    />
+  );
+}
+
+function DinaTab({allTasks,onAddToday,onEditTask}){
+  return(
+    <RefTab title="Dinacharya" subtitle="Daily rhythm — the container of everything" categoryFilter="dinacharya" allTasks={allTasks} onAddToday={onAddToday} onEditTask={onEditTask}
+      extraContent={<div className="rc3" style={{margin:"0 0 10px"}}><div className="rct">The Principle</div><div className="dd" style={{marginTop:0}}>Vata is stabilised by regularity above almost everything else. Fixed wake time, fixed meals, fixed sleep time. This structural antidote is the most powerful single intervention for HPA axis dysregulation.</div></div>}
+    />
+  );
+}
+
+// ─── MAIN APP ────────────────────────────────────────────────────────────────
 const MENU=[
-  {id:"today",label:"Today",icon:"🗓"},{id:"weekly",label:"Weekly Summary",icon:"📈"},
-  {id:"diet",label:"Diet",icon:"🍲"},{id:"movement",label:"Movement",icon:"🌿"},
-  {id:"breathwork",label:"Breathwork",icon:"🌬"},{id:"bodywork",label:"Bodywork",icon:"🤲"},
-  {id:"supplements",label:"Supplements",icon:"💊"},{id:"ayurveda",label:"Ayurveda Reference",icon:"🌀"},
+  {id:"today",label:"Today",icon:"🗓"},
+  {id:"weekly",label:"Weekly Summary",icon:"📈"},
+  {id:"diet",label:"Diet",icon:"🍲"},
+  {id:"movement",label:"Movement",icon:"🌿"},
+  {id:"breathwork",label:"Breathwork",icon:"🌬"},
+  {id:"bodywork",label:"Bodywork",icon:"🤲"},
+  {id:"dinacharya",label:"Dinacharya",icon:"🕯"},
+  {id:"supplements",label:"Supplements",icon:"💊"},
+  {id:"scent-sound",label:"Scent & Sound",icon:"🌸"},
+  {id:"ayurveda",label:"Ayurveda Reference",icon:"🌀"},
   {id:"settings",label:"Settings",icon:"⚙️"},
 ];
 
 function App(){
   const[mOpen,setMOpen]=useState(false);
   const[sec,setSec]=useState("today");
-  const[date,setDate]=useState(fd(new Date()));
+  const[date,setDate]=useState(todayStr());
   const[allData,setAllData]=useState({});
   const[sheet,setSheet]=useState(null);
   const[comment,setComment]=useState("");
-  const[custom,setCustom]=useState([]);
-  const today=fd(new Date());
-  const minDate=fd(new Date(Date.now()-7*86400000));
+  const[sheetTime,setSheetTime]=useState("");
+  const[blockOpen,setBlockOpen]=useState(()=>lsGet("blockState",{morning:true,midday:true,afternoon:false,evening:false,winddown:false,night:false}));
+
+  const{allTasks,resolvedTasks,customTasks,customSupps,updateTask,addCustomTask,addCustomSupp,updateCustomSupp,deleteCustomSupp,archiveTask,restoreTask,overrides}=useTaskLibrary();
+
+  const today=todayStr();
+  const minDate=fmtDate(new Date(Date.now()-7*86400000));
 
   useEffect(()=>{
     const loaded={};
-    for(let i=0;i<30;i++){const d=fd(new Date(Date.now()-i*86400000));const data=ld(d);if(Object.keys(data.completed||{}).length>0||Object.keys(data.symptoms||{}).length>0)loaded[d]=data;}
+    for(let i=0;i<30;i++){
+      const d=fmtDate(new Date(Date.now()-i*86400000));
+      const data=loadDay(d);
+      if(Object.keys(data.completed||{}).length>0||Object.keys(data.symptoms||{}).length>0)loaded[d]=data;
+    }
     setAllData(loaded);
-    try{const cs=localStorage.getItem("customSupplements");if(cs)setCustom(JSON.parse(cs));}catch{}
   },[]);
 
-  const dayData=allData[date]||{completed:{},comments:{},symptoms:{}};
-  const upd=nd=>{const u={...allData,[date]:nd};setAllData(u);sd(date,nd);};
-  const complete=id=>upd({...dayData,completed:{...dayData.completed,[id]:true}});
-  const undo=id=>{const c={...dayData.completed};delete c[id];upd({...dayData,completed:c});};
-  const symChange=(k,v)=>upd({...dayData,symptoms:{...dayData.symptoms,[k]:v}});
-  const symSave=id=>upd({...dayData,completed:{...dayData.completed,[id]:true}});
-  const saveComment=()=>{if(!sheet)return;upd({...dayData,comments:{...dayData.comments,[sheet.id]:comment}});};
+  const dayData=allData[date]||{completed:{},comments:{},times:{},symptoms:{}};
 
-  const mand=TASKS.filter(t=>t.priority==="mandatory"&&t.category!=="tracking");
+  const upd=nd=>{const u={...allData,[date]:nd};setAllData(u);saveDay(date,nd);};
+  
+  const complete=id=>{
+    const now=fmtTime(new Date());
+    upd({...dayData,completed:{...dayData.completed,[id]:true},times:{...dayData.times,[id]:now}});
+  };
+  const undo=id=>{
+    const c={...dayData.completed};const t={...dayData.times};
+    delete c[id];delete t[id];
+    upd({...dayData,completed:c,times:t});
+  };
+  const symChange=(k,v)=>upd({...dayData,symptoms:{...dayData.symptoms,[k]:v}});
+  const symSave=id=>upd({...dayData,completed:{...dayData.completed,[id]:true},times:{...dayData.times,[id]:fmtTime(new Date())}});
+  const saveComment=()=>{
+    if(!sheet)return;
+    upd({...dayData,comments:{...dayData.comments,[sheet.id]:comment},times:{...dayData.times,[sheet.id]:sheetTime||dayData.times?.[sheet.id]||""}});
+  };
+
+  const toggleBlock=id=>{
+    const nb={...blockOpen,[id]:!(blockOpen[id]!==undefined?blockOpen[id]:(id==="morning"||id==="midday"))};
+    setBlockOpen(nb);lsSet("blockState",nb);
+  };
+
+  const nav=dir=>{
+    const d=new Date(date);d.setDate(d.getDate()+dir);
+    const nd=fmtDate(d);if(nd>=minDate&&nd<=today)setDate(nd);
+  };
+
+  // Tasks shown in today — all active tasks + any one-time additions
+  const todayExtraKey="todayExtras_"+date;
+  const[todayExtras,setTodayExtras]=useState(()=>lsGet(todayExtraKey,[]));
+  useEffect(()=>{setTodayExtras(lsGet(todayExtraKey,[]));},[ date]);
+
+  const addToToday=(task)=>{
+    // Mark as a one-time addition for today — place at top of its block
+    const extras=lsGet(todayExtraKey,[]);
+    if(!extras.find(e=>e.id===task.id)){
+      const updated=[task,...extras];
+      lsSet(todayExtraKey,updated);
+      setTodayExtras(updated);
+    }
+  };
+
+  // Build visible task list for today
+  const todayTasks=BLOCKS.reduce((acc,block)=>{
+    const blockExtras=todayExtras.filter(t=>t.block===block.id);
+    const regularTasks=allTasks.filter(t=>t.block===block.id&&!t.hidden&&!t.archived);
+    // Merge: extras at top, no duplicates
+    const seen=new Set(blockExtras.map(t=>t.id));
+    const merged=[...blockExtras,...regularTasks.filter(t=>!seen.has(t.id))];
+    return{...acc,[block.id]:merged};
+  },{});
+
+  const flatTodayTasks=BLOCKS.flatMap(b=>todayTasks[b.id]||[]);
+
+  const mand=flatTodayTasks.filter(t=>t.priority==="mandatory"&&t.category!=="tracking");
   const compMand=mand.filter(t=>dayData.completed?.[t.id]);
   const pct=mand.length>0?Math.round((compMand.length/mand.length)*100):0;
-  const rec=TASKS.filter(t=>t.priority==="recommended"&&t.category!=="tracking");
+  const rec=flatTodayTasks.filter(t=>t.priority==="recommended"&&t.category!=="tracking");
   const compRec=rec.filter(t=>dayData.completed?.[t.id]);
-  const opt=TASKS.filter(t=>t.priority==="optional"&&!t.hidden);
+  const opt=flatTodayTasks.filter(t=>t.priority==="optional"&&!t.hidden);
   const compOpt=opt.filter(t=>dayData.completed?.[t.id]);
   const circ=2*Math.PI*26,offset=circ-(pct/100)*circ;
-  const visible=TASKS.filter(t=>!t.hidden);
-  const nav=dir=>{const d=new Date(date);d.setDate(d.getDate()+dir);const nd=fd(d);if(nd>=minDate&&nd<=today)setDate(nd);};
-  const addCustom=s=>{const u=[...custom,s];setCustom(u);localStorage.setItem("customSupplements",JSON.stringify(u));};
-  const togCustom=id=>{const u=custom.map(s=>s.id===id?{...s,active:!s.active}:s);setCustom(u);localStorage.setItem("customSupplements",JSON.stringify(u));};
 
-  return <>
-    <style>{CSS}</style>
-    <div className="app">
-      <div className="topbar">
-        <div className="tbt">{sec==="today"?gl(date):MENU.find(m=>m.id===sec)?.label}</div>
-        <button className="hbtn" onClick={()=>setMOpen(true)}><span/><span/><span/></button>
-      </div>
-      <div className={`ov${mOpen?" open":""}`} onClick={()=>setMOpen(false)}/>
-      <div className={`menu${mOpen?" open":""}`}>
-        <div className="mhdr"><h2>Nelson's Protocol</h2><p>Integrated daily guide</p></div>
-        {MENU.map(m=><button key={m.id} className={`mi${sec===m.id?" act":""}`} onClick={()=>{setSec(m.id);setMOpen(false);}}><span className="mic">{m.icon}</span>{m.label}</button>)}
-      </div>
-      <div className="main">
-        {sec==="today"&&<>
-          <div className="dnav">
-            <button className="dnb" onClick={()=>nav(-1)} disabled={date<=minDate}>‹</button>
-            <div className="ddsp"><div className="dlbl">{gl(date)}</div><div className="dfl">{new Date(date+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})}</div></div>
-            <button className="dnb" onClick={()=>nav(1)} disabled={date>=today}>›</button>
-          </div>
-          <div className="psec">
-            <div className="rw">
-              <svg width="64" height="64" viewBox="0 0 64 64">
-                <circle cx="32" cy="32" r="26" fill="none" stroke="var(--crd)" strokeWidth="6"/>
-                <circle cx="32" cy="32" r="26" fill="none" stroke="var(--tc)" strokeWidth="6" strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{transition:"stroke-dashoffset .5s ease"}}/>
-              </svg>
-              <div className="rc">{pct}%</div>
+  const handleEditTask=(id,changes)=>{
+    // Check if it's a custom supplement
+    if(customSupps.find(s=>s.id===id)){updateCustomSupp(id,changes);return;}
+    updateTask(id,changes);
+  };
+
+  return(
+    <>
+      <style>{CSS}</style>
+      <div className="app">
+        <div className="topbar">
+          <div className="tbt">{sec==="today"?getLabel(date):MENU.find(m=>m.id===sec)?.label}</div>
+          <button className="hbtn" onClick={()=>setMOpen(true)}><span/><span/><span/></button>
+        </div>
+
+        <div className={`ov${mOpen?" open":""}`} onClick={()=>setMOpen(false)}/>
+        <div className={`menu${mOpen?" open":""}`}>
+          <div className="mhdr"><h2>Nelson's Protocol</h2><p>Integrated daily guide · v1.2</p></div>
+          {MENU.map(m=><button key={m.id} className={`mi${sec===m.id?" act":""}`} onClick={()=>{setSec(m.id);setMOpen(false);}}><span className="mic">{m.icon}</span>{m.label}</button>)}
+        </div>
+
+        <div className="main">
+          {sec==="today"&&<>
+            <div className="dnav">
+              <button className="dnb" onClick={()=>nav(-1)} disabled={date<=minDate}>‹</button>
+              <div className="ddsp">
+                <div className="dlbl">{getLabel(date)}</div>
+                <div className="dfl">{new Date(date+"T12:00:00").toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"})}</div>
+              </div>
+              <button className="dnb" onClick={()=>nav(1)} disabled={date>=today}>›</button>
             </div>
-            <div className="pst">
-              <div className="pt">Daily Progress</div>
-              <div className="pn">{compMand.length} of {mand.length} mandatory</div>
-              <div className="pbs">
-                <div className="pbi"><div className="pbl">Must</div><div className="pbt"><div className="pbf" style={{width:`${mand.length>0?(compMand.length/mand.length)*100:0}%`,background:"var(--tc)"}}/></div></div>
-                <div className="pbi"><div className="pbl">Rec</div><div className="pbt"><div className="pbf" style={{width:`${rec.length>0?(compRec.length/rec.length)*100:0}%`,background:"var(--oc)"}}/></div></div>
-                <div className="pbi"><div className="pbl">Opt</div><div className="pbt"><div className="pbf" style={{width:`${opt.length>0?(compOpt.length/opt.length)*100:0}%`,background:"var(--fo)"}}/></div></div>
+            <div className="psec">
+              <div className="rw">
+                <svg width="60" height="60" viewBox="0 0 60 60">
+                  <circle cx="30" cy="30" r="24" fill="none" stroke="#E8DDD0" strokeWidth="5"/>
+                  <circle cx="30" cy="30" r="24" fill="none" stroke="#8B4A2A" strokeWidth="5" strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{transition:"stroke-dashoffset .5s ease"}}/>
+                </svg>
+                <div className="rc">{pct}%</div>
+              </div>
+              <div className="pst">
+                <div className="pt">Daily Progress</div>
+                <div className="pn">{compMand.length} of {mand.length} mandatory</div>
+                <div className="pbs">
+                  <div className="pbi"><div className="pbl">Must</div><div className="pbt"><div className="pbf" style={{width:`${mand.length>0?(compMand.length/mand.length)*100:0}%`,background:"#8B4A2A"}}/></div></div>
+                  <div className="pbi"><div className="pbl">Rec</div><div className="pbt"><div className="pbf" style={{width:`${rec.length>0?(compRec.length/rec.length)*100:0}%`,background:"#7A6230"}}/></div></div>
+                  <div className="pbi"><div className="pbl">Opt</div><div className="pbt"><div className="pbf" style={{width:`${opt.length>0?(compOpt.length/opt.length)*100:0}%`,background:"#4A6B4A"}}/></div></div>
+                </div>
               </div>
             </div>
-          </div>
-          {BLOCKS.map(b=><Block key={b.id} block={b} tasks={visible} dayData={dayData} onComplete={complete} onUndo={undo} onSheet={t=>{setSheet(t);setComment(dayData.comments?.[t.id]||"");}} onSymChange={symChange} onSymSave={symSave}/>)}
-        </>}
-        {sec==="weekly"&&<WeekTab allData={allData}/>}
-        {sec==="diet"&&<DietTab/>}
-        {sec==="movement"&&<MovTab/>}
-        {sec==="breathwork"&&<BwTab/>}
-        {sec==="bodywork"&&<BodyTab/>}
-        {sec==="supplements"&&<SupTab custom={custom} onAdd={addCustom} onToggle={togCustom}/>}
-        {sec==="ayurveda"&&<AyuTab/>}
-        {sec==="settings"&&<SetTab allData={allData} custom={custom}/>}
+            {BLOCKS.map(block=>(
+              <TimeBlock
+                key={block.id}
+                block={block}
+                tasks={todayTasks[block.id]||[]}
+                dayData={dayData}
+                blockOpen={blockOpen}
+                onToggle={()=>toggleBlock(block.id)}
+                onComplete={complete}
+                onUndo={undo}
+                onSheet={task=>{setSheet(task);setComment(dayData.comments?.[task.id]||"");setSheetTime(dayData.times?.[task.id]||"");}}
+                onSymChange={symChange}
+                onSymSave={symSave}
+              />
+            ))}
+          </>}
+
+          {sec==="weekly"&&<WeekTab allData={allData}/>}
+          {sec==="diet"&&<DietTab allTasks={allTasks} onAddToday={addToToday} onEditTask={handleEditTask}/>}
+          {sec==="movement"&&<MovTab allTasks={allTasks} onAddToday={addToToday} onEditTask={handleEditTask}/>}
+          {sec==="breathwork"&&<BwTab allTasks={allTasks} onAddToday={addToToday} onEditTask={handleEditTask}/>}
+          {sec==="bodywork"&&<BodyTab allTasks={allTasks} onAddToday={addToToday} onEditTask={handleEditTask}/>}
+          {sec==="dinacharya"&&<DinaTab allTasks={allTasks} onAddToday={addToToday} onEditTask={handleEditTask}/>}
+          {sec==="supplements"&&<SupplementsTab allTasks={allTasks} customSupps={customSupps} onAdd={addCustomSupp} onUpdate={updateCustomSupp} onDelete={deleteCustomSupp} onEditTask={handleEditTask}/>}
+          {sec==="scent-sound"&&<ScentSoundTab/>}
+          {sec==="ayurveda"&&<AyuTab/>}
+          {sec==="settings"&&<SetTab allData={allData} customSupps={customSupps} taskOverrides={overrides} customTasks={customTasks}/>}
+        </div>
+
+        <Sheet
+          task={sheet}
+          open={!!sheet}
+          onClose={()=>setSheet(null)}
+          onComplete={id=>{complete(id);setSheet(null);}}
+          comment={comment}
+          onCC={setComment}
+          onSave={saveComment}
+          time={sheetTime}
+          onTimeChange={setSheetTime}
+          allTasks={allTasks}
+        />
       </div>
-      <Sheet task={sheet} open={!!sheet} onClose={()=>setSheet(null)} onComplete={id=>{complete(id);setSheet(null);}} comment={comment} onCC={setComment} onSave={saveComment}/>
-    </div>
-  </>;
+    </>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
